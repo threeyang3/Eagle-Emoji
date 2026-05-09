@@ -90,6 +90,79 @@ main {
     overflow: hidden;
 }
 
+/* Thumbnail list */
+.thumb-list {
+    width: 80px;
+    background: var(--bg-panel);
+    border-right: 1px solid var(--border);
+    overflow-y: auto;
+    flex-shrink: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    padding: 4px;
+}
+
+.thumb-list:empty {
+    display: none;
+}
+
+.thumb-item {
+    position: relative;
+    width: 72px;
+    height: 72px;
+    border-radius: var(--radius);
+    overflow: hidden;
+    cursor: pointer;
+    border: 2px solid transparent;
+    transition: border-color 0.12s;
+    flex-shrink: 0;
+}
+
+.thumb-item:hover {
+    border-color: var(--border);
+}
+
+.thumb-item.active {
+    border-color: var(--accent);
+}
+
+.thumb-item img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    display: block;
+}
+
+.thumb-item .thumb-index {
+    position: absolute;
+    top: 2px;
+    left: 2px;
+    background: rgba(0, 0, 0, 0.6);
+    color: #fff;
+    font-size: 10px;
+    padding: 1px 4px;
+    border-radius: 2px;
+    line-height: 1.3;
+}
+
+.thumb-item.done::after {
+    content: '✓';
+    position: absolute;
+    bottom: 2px;
+    right: 2px;
+    background: var(--accent);
+    color: #fff;
+    font-size: 10px;
+    width: 16px;
+    height: 16px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    line-height: 1;
+}
+
 /* Image panel — dark canvas like Eagle's viewer */
 .image-panel {
     flex: 1;

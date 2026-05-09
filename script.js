@@ -32,7 +32,8 @@ const elements = {
     textSizeValue: document.getElementById('text-size-value'),
     textColor: document.getElementById('text-color'),
     textStroke: document.getElementById('text-stroke'),
-    textOverlay: document.getElementById('text-overlay')
+    textOverlay: document.getElementById('text-overlay'),
+    thumbList: document.getElementById('thumb-list')
 };
 
 // 插件初始化
@@ -77,6 +78,7 @@ eagle.onPluginCreate(async (plugin) => {
     }
 
     elements.totalCount.textContent = selectedItems.length;
+    renderThumbList();
     showItem(0);
 });
 
@@ -90,6 +92,8 @@ function showItem(index) {
     elements.currentIndex.textContent = currentIndex + 1;
     elements.prevBtn.disabled = currentIndex === 0;
     elements.nextBtn.textContent = currentIndex === selectedItems.length - 1 ? '保存并完成' : '保存并下一个';
+
+    updateThumbActive();
 
     if (cropper) {
         cropper.destroy();
@@ -117,6 +121,42 @@ function showItem(index) {
             }
         });
     };
+}
+
+// ===== 缩略图列表 =====
+
+function renderThumbList() {
+    const list = elements.thumbList;
+    list.innerHTML = '';
+
+    selectedItems.forEach((item, i) => {
+        const div = document.createElement('div');
+        div.className = 'thumb-item';
+        div.dataset.index = i;
+
+        const filePath = item.filePath.replace(/\\/g, '/');
+        div.innerHTML = `
+            <img src="file:///${filePath.startsWith('/') ? '' : '/'}${filePath}" alt="">
+            <span class="thumb-index">${i + 1}</span>
+        `;
+
+        div.addEventListener('click', () => showItem(i));
+        list.appendChild(div);
+    });
+}
+
+function updateThumbActive() {
+    const items = elements.thumbList.querySelectorAll('.thumb-item');
+    items.forEach((el, i) => {
+        el.classList.toggle('active', i === currentIndex);
+    });
+}
+
+function markThumbDone(index) {
+    const items = elements.thumbList.querySelectorAll('.thumb-item');
+    if (items[index]) {
+        items[index].classList.add('done');
+    }
 }
 
 // "下一步"按钮点击处理
@@ -200,6 +240,7 @@ async function processAndSave() {
     }
 
     saveSettings();
+    markThumbDone(currentIndex);
 }
 
 // 绑定旋转/翻转按钮事件
