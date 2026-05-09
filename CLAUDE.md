@@ -35,23 +35,24 @@ The flow: Eagle launches plugin → `eagle.onPluginCreate` grabs selected items 
 
 ## Release Workflow
 
-发布新版本时，使用 `gh release create` 创建 GitHub Release，将以下插件必需文件打包为 zip 附件：
+发布新版本的完整流程：
 
-```
-manifest.json
-index.html
-logo.png
-script.js
-style.css
-```
+1. **提交代码** — 确保所有改动已 commit 并 push 到 GitHub
+   ```bash
+   git add -A
+   git commit -m "vX.Y.Z: 版本说明"
+   git push
+   ```
 
-发布命令示例：
-```bash
-# 打包插件文件
-zip -j wechat-sticker-pro-vX.Y.Z.zip manifest.json index.html logo.png script.js style.css
+2. **打包插件文件** — 将以下 5 个必需文件打成 zip：
+   - `manifest.json`、`index.html`、`logo.png`、`script.js`、`style.css`
+   ```bash
+   zip -j wechat-sticker-pro-vX.Y.Z.zip manifest.json index.html logo.png script.js style.css
+   ```
 
-# 创建 release 并上传附件
-gh release create vX.Y.Z wechat-sticker-pro-vX.Y.Z.zip \
-  --title "vX.Y.Z" \
-  --notes "版本说明"
-```
+3. **创建 Release** — 使用 `gh release create` 发布并上传附件
+   ```bash
+   gh release create vX.Y.Z wechat-sticker-pro-vX.Y.Z.zip \
+     --title "vX.Y.Z" \
+     --notes "版本说明"
+   ```
