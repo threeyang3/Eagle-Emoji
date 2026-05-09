@@ -32,3 +32,26 @@ The flow: Eagle launches plugin → `eagle.onPluginCreate` grabs selected items 
 - Crop aspect ratio is hardcoded to **1:1** — do not change
 - External dependency (Cropper.js 1.5.13) loaded via CDN — no package manager
 - No build, lint, or test commands exist; changes are live-reloaded by Eagle
+
+## Release Workflow
+
+发布新版本时，使用 `gh release create` 创建 GitHub Release，将以下插件必需文件打包为 zip 附件：
+
+```
+manifest.json
+index.html
+logo.png
+script.js
+style.css
+```
+
+发布命令示例：
+```bash
+# 打包插件文件
+zip -j wechat-sticker-pro-vX.Y.Z.zip manifest.json index.html logo.png script.js style.css
+
+# 创建 release 并上传附件
+gh release create vX.Y.Z wechat-sticker-pro-vX.Y.Z.zip \
+  --title "vX.Y.Z" \
+  --notes "版本说明"
+```
