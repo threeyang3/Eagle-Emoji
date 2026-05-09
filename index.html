@@ -1,0 +1,105 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>微信表情包大师</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/cropperjs/1.5.13/cropper.min.css">
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <div id="app">
+        <header>
+            <div class="progress">项目 <span id="current-index">0</span> / <span id="total-count">0</span></div>
+            <h1>微信表情包大师</h1>
+            <button id="settings-toggle" title="显示/隐藏设置">⚙</button>
+        </header>
+
+        <main>
+            <div class="image-panel">
+                <img id="image-to-crop" src="" alt="待裁剪图片">
+                <div id="text-overlay" class="text-overlay hidden"></div>
+                <div class="image-toolbar">
+                    <button id="rotate-left" title="左旋 90°">↶</button>
+                    <button id="rotate-right" title="右旋 90°">↷</button>
+                    <button id="flip-h" title="水平翻转">⇔</button>
+                </div>
+            </div>
+
+            <aside class="controls">
+                <div class="controls-fixed">
+                    <section class="settings">
+                        <h3>文字</h3>
+                        <div class="control-group">
+                            <label for="text-content">文字内容：</label>
+                            <input type="text" id="text-content" placeholder="输入表情包文字（可含 emoji）">
+                        </div>
+                        <div class="control-group">
+                            <label for="text-size">字号：<span id="text-size-value">28</span>px</label>
+                            <input type="range" id="text-size" min="12" max="72" value="28">
+                        </div>
+                        <div class="control-group">
+                            <label for="text-color">文字颜色：</label>
+                            <input type="color" id="text-color" value="#ffffff">
+                        </div>
+                        <div class="control-group">
+                            <label>描边：</label>
+                            <label class="checkbox-label">
+                                <input type="checkbox" id="text-stroke" checked> 启用黑色描边
+                            </label>
+                        </div>
+                        <p class="hint">拖拽图片上的文字框调整位置</p>
+                    </section>
+
+                    <div class="preview-section">
+                        <h3>预览</h3>
+                        <div class="preview-container">
+                            <img id="preview-img" src="" alt="输出预览">
+                        </div>
+                    </div>
+                </div>
+
+                <div class="settings-scroll" id="settings-scroll">
+                    <section class="settings">
+                        <h3>导出设置</h3>
+                        <div class="control-group">
+                            <label for="export-format">保存格式：</label>
+                            <select id="export-format">
+                                <option value="image/png">PNG (无损)</option>
+                                <option value="image/jpeg">JPG (压缩)</option>
+                            </select>
+                        </div>
+                        <div class="control-group">
+                            <label>
+                                <input type="checkbox" id="delete-original"> 保存后删除原图
+                            </label>
+                        </div>
+                        <div class="control-group">
+                            <label for="tags">添加标签 (逗号分隔)：</label>
+                            <input type="text" id="tags" placeholder="例如：表情包, 微信">
+                        </div>
+                        <div class="control-group">
+                            <label for="folder-id">目标文件夹 ID (可选)：</label>
+                            <input type="text" id="folder-id" placeholder="在此粘贴文件夹 ID">
+                        </div>
+                    </section>
+                </div>
+
+                <div class="actions">
+                    <button id="prev-btn" disabled>上一个</button>
+                    <button id="next-btn" class="primary">保存并下一个</button>
+                    <button id="skip-btn">跳过</button>
+                </div>
+            </aside>
+        </main>
+
+        <div id="loading-overlay" class="hidden">
+            <div class="loader"></div>
+            <p>正在处理...</p>
+        </div>
+    </div>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/cropperjs/1.5.13/cropper.min.js"></script>
+    <script src="script.js"></script>
+</body>
+</html>

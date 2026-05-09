@@ -1,0 +1,23 @@
+{
+  "id": "com.cctry.wechat-sticker-pro",
+  "version": "1.0.0",
+  "name": "微信表情包大师",
+  "logo": "logo.png",
+  "description": "快速将图片裁剪、缩放并压缩为微信表情包（300x300px）。",
+  "keywords": ["微信", "表情包", "裁剪", "缩放", "批量"],
+  "platform": "all",
+  "arch": "all",
+  "devTools": false,
+  "main": {
+    "url": "index.html",
+    "width": 900,
+    "height": 700,
+    "minWidth": 600,
+    "minHeight": 500,
+    "frame": true,
+    "alwaysOnTop": false,
+    "fullscreenable": true,
+    "childWindow": true,
+    "followCursor": true
+  }
+}
