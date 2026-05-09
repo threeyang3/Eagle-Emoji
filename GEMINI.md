@@ -4,7 +4,7 @@
 这是一个为 Eagle 设计的窗口插件，旨在快速将选中的图片处理为符合微信规范的表情包。
 
 ## 技术栈
-- **UI**: 原生 HTML/CSS (WeChat Green 风格)。
+- **UI**: 原生 HTML/CSS (Eagle 原生风格，浅灰底 + 蓝色主色)。
 - **核心库**: [Cropper.js](https://github.com/fengyuanchen/cropperjs) (裁剪)。
 - **逻辑**: JavaScript (Canvas API 处理图像，Node.js `fs` 处理文件)。
 - **API**: [Eagle Plugin API](https://developer.eagle.cool/plugin-api)。
@@ -22,5 +22,6 @@
 - **样式表**: `style.css`
 
 ## 已知局限
-- 目前使用 `file://` 协议加载本地图片，需确保 Eagle 权限允许。
-- 批量处理依赖于 `eagle.item.getSelected()` 的初始列表。
+- 使用 `file://` 协议加载本地图片，需确保 Eagle 权限允许。
+- 批量处理依赖于 `eagle.item.getSelected()` 的初始列表，处理期间无法动态增删。
+- 文字浮层位置基于裁剪框坐标，裁剪框移动时文字会跟随。

@@ -11,19 +11,21 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 - `manifest.json` — Eagle plugin config (entry point, window size, plugin ID)
 - `index.html` — UI shell; loads Cropper.js from cdnjs CDN
 - `script.js` — all logic: Eagle API integration, Cropper.js lifecycle, Canvas-based image processing, batch queue, localStorage settings persistence
-- `style.css` — WeChat-green themed UI
+- `style.css` — Eagle native style (light grays, blue accent `#4a90d9`)
+- `logo.png` — plugin icon (referenced by `manifest.json`)
 
-The flow: Eagle launches plugin → `eagle.onPluginCreate` grabs selected items → user crops each image with Cropper.js (locked 1:1) → `getCroppedCanvas` renders to 300x300 → buffer written to temp file → `eagle.item.addFromPath` imports back into Eagle.
+The flow: Eagle launches plugin → `eagle.onPluginCreate` grabs selected items → renders thumbnail list on the left → user crops each image with Cropper.js (locked 1:1) → draggable text overlay for positioning → `getCroppedCanvas` renders to 300x300 → text drawn via Canvas → buffer written to temp file → `eagle.item.addFromPath` imports back into Eagle → `closeAndFocus()` focuses Eagle main window and opens target folder.
 
 ## Key Technical Details
 
-- **Eagle Plugin API**: `eagle.onPluginCreate` for init, `eagle.item.getSelected()` for batch input, `eagle.item.addFromPath()` for save, `eagle.item.moveToTrash()` for optional delete
+- **Eagle Plugin API**: `eagle.onPluginCreate` for init, `eagle.item.getSelected()` for batch input, `eagle.item.addFromPath()` for save, `eagle.item.moveToTrash()` for optional delete, `eagle.mainWindow.focus()` + `eagle.folder.open()` for post-save focus
 - **Image loading**: uses `file://` protocol on `item.filePath` — requires Eagle permission
 - **Cropper.js**: locked `aspectRatio: 1/1`, `viewMode: 1`, `autoCropArea: 1`. Also uses `rotate()`, `scaleX()` for flip, and `crop` event for live preview
 - **Output**: always 300x300px; JPG at quality 0.8 or PNG lossless
 - **Settings persistence**: `localStorage` key `wechat_sticker_settings` (format, tags, folder ID, delete-original, text content/size/color/position/stroke)
-- **Text overlay**: rendered via Canvas `fillText`/`strokeText` after cropping, before export. Font: bold Microsoft YaHei/PingFang SC
-- **Settings panel**: hides after first use (checks localStorage); toggle button (⚙) in header to show/hide. Only settings scroll area hides — action buttons always visible
+- **Text overlay**: draggable `<div>` positioned via `textPos` relative coordinates (0–1); synced to crop box via `positionOverlay()`. Rendered via Canvas `fillText`/`strokeText` on export. Font: bold Microsoft YaHei/PingFang SC. Style (size, color, stroke) synced in real-time from controls.
+- **Thumbnail list**: 80px left sidebar showing all selected items. Click to navigate. Completed items get a checkmark (`.done` class).
+- **Settings panel**: export settings section hides after first use (checks localStorage); toggle button (⚙) in header to show/hide. Text settings + preview in `.controls-fixed` are always visible. Action buttons always visible at bottom.
 
 ## Constraints
 
