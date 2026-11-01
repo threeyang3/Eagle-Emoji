@@ -35,7 +35,7 @@ eagle.onPluginCreate(async () => {
 });
 
 function bindControls() {
- elements.settingsToggle.addEventListener('click', () => elements.settingsScroll.classList.toggle('hidden-sidebar'));
+ elements.settingsToggle.addEventListener('click', () => { elements.settingsScroll.classList.toggle('hidden-sidebar'); saveSettings(); });
  elements.textSize.addEventListener('input', () => {
   elements.textSizeValue.textContent = elements.textSize.value;
   syncOverlayStyle(); updatePreview(); saveSettings();
@@ -221,7 +221,7 @@ function initDrag() {
  });
  overlay.addEventListener('pointermove',event=>{
   if(!isDragging||event.pointerId!==dragPointerId||!cropper)return;
-  const panelRect=panel.getBoundingClientRect(),box=cropper.getCropBoxData();
+  const panelRect=panel.getBoundingClientRect(),box=getCropBoxInPanel(panel);
   const cx=event.clientX-panelRect.left-dragOffset.x,cy=event.clientY-panelRect.top-dragOffset.y;
   textPos={x:clamp((cx-box.left)/box.width,0,1),y:clamp((cy-box.top)/box.height,0,1)};
   positionOverlay();updatePreview();
@@ -233,10 +233,17 @@ function initDrag() {
  overlay.addEventListener('pointerup',stop);overlay.addEventListener('pointercancel',stop);
  overlay.addEventListener('lostpointercapture',stop);
 }
+function getCropBoxInPanel(panel) {
+ const box=cropper.getCropBoxData();
+ const containerRect=elements.image.parentElement.getBoundingClientRect();
+ const panelRect=panel.getBoundingClientRect();
+ return {left:containerRect.left-panelRect.left+box.left,top:containerRect.top-panelRect.top+box.top,width:box.width,height:box.height};
+}
 function positionOverlay() {
  const overlay=elements.textOverlay;
  if(!elements.textContent.value.trim()||!cropper){overlay.classList.add('hidden');return;}
- const box=cropper.getCropBoxData();overlay.classList.remove('hidden');
+ const panel=document.querySelector('.image-panel'),box=getCropBoxInPanel(panel);
+ overlay.classList.remove('hidden');
  overlay.style.left=(box.left+textPos.x*box.width)+'px';
  overlay.style.top=(box.top+textPos.y*box.height)+'px';
  overlay.style.fontSize=(Number(elements.textSize.value)*box.width/OUTPUT_SIZE)+'px';
