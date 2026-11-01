@@ -4,7 +4,6 @@ const os = require('os');
 const { pathToFileURL } = require('url');
 const SETTINGS_KEY = 'wechat_sticker_settings';
 const DEFAULT_TEXT_LAYER = {text:'',x:0.5,y:0.82,size:28,color:'#ffffff',fontFamily:'Microsoft YaHei',stroke:true,strokeWidth:3,background:false,backgroundColor:'#000000'};
-const DEFAULT_TEXT_LAYER = {text:'',x:0.5,y:0.82,size:28,color:'#ffffff',fontFamily:'Microsoft YaHei',stroke:true,strokeWidth:3,background:false,backgroundColor:'#000000'};
 const OUTPUT_SIZE = 300;
 let cropper = null, selectedItems = [], currentIndex = 0;
 let textPos = { x: 0.5, y: 0.82 }, isDragging = false, dragPointerId = null;
@@ -69,7 +68,7 @@ function bindControls() {
  updateQualityVisibility();
  elements.textContent.addEventListener('input', () => {
   const layer=getActiveLayer(); if(!layer)return; layer.text=elements.textContent.value;
-  updateOverlayContent(); positionOverlay(); renderLayerList(); updatePreview(); saveSettings();
+  updateOverlayContent(); renderLayerList(); updatePreview(); saveSettings();
  });
  [elements.format,elements.deleteOriginal,elements.tags,elements.folderId].forEach(el => {
   el.addEventListener('change', saveSettings); el.addEventListener('input', saveSettings);
@@ -169,7 +168,7 @@ async function showItem(index, allowProcessing = false) {
   await imageReady; if (token!==loadToken) return;
   cropper=new Cropper(elements.image,{
    aspectRatio:1,viewMode:1,autoCropArea:1,responsive:true,background:false,
-   ready(){if(token!==loadToken)return;const savedEdit=itemEdits.get(index);if(savedEdit)cropper.setData(savedEdit);activeItemIndex=index;elements.nextBtn.disabled=isProcessing;syncOverlayStyle();updateOverlayContent();positionOverlay();updatePreview();},
+   ready(){if(token!==loadToken)return;const savedEdit=itemEdits.get(index);if(savedEdit)cropper.setData(savedEdit);activeItemIndex=index;elements.nextBtn.disabled=isProcessing;syncLayerControls();renderLayerList();positionOverlay();updatePreview();},
    crop(){if(token!==loadToken)return;positionOverlay();updatePreview();}
   });
  } catch(error) {
