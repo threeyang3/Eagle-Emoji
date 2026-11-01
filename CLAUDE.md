@@ -1,60 +1,42 @@
 # CLAUDE.md
 
-This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+## 项目定位
 
-## Project Overview
+微信表情包大师是直接运行于 Eagle 插件环境的桌面插件，使用原生 HTML/CSS/JavaScript、Eagle Plugin API、Node.js 文件能力及本地 Cropper.js。
 
-微信表情包大师 (WeChat Sticker Pro) — an Eagle plugin that batch-processes images into WeChat-compliant stickers (300x300px, 1:1 crop). No build system; plain HTML/CSS/JS loaded directly by Eagle.
+## 不可破坏的约束
 
-## Architecture
+1. 导出尺寸固定为 300 × 300 px，裁剪比例固定为 1:1。
+2. 原图删除默认关闭。必须先成功执行 addFromPath，再尝试 moveToTrash。
+3. 导入成功但移入回收站失败时，不得重复导入新文件。
+4. 临时文件必须在 finally 中清理。
+5. 队列处理期间防止重复提交、跳转和并发修改。
+6. 图片路径使用 pathToFileURL。
+7. 每张图片的裁剪、旋转、翻转状态在队列切换时保留。
+8. 文字图层独立保存内容、归一化位置和样式；预览与导出必须遍历同一组图层。
+9. 文字模板只保存样式，不覆盖目标图层文字内容或位置。
+10. 导出大小限制必须在导入 Eagle 前执行；JPG 可逐步降低质量，PNG 超限时应明确提示，不能静默突破。
+11. 不得将用户素材或模板上传到外部服务。
 
-- `manifest.json` — Eagle plugin config (entry point, window size, plugin ID)
-- `index.html` — UI shell; loads Cropper.js from cdnjs CDN
-- `script.js` — all logic: Eagle API integration, Cropper.js lifecycle, Canvas-based image processing, batch queue, localStorage settings persistence
-- `style.css` — Eagle native style (light grays, blue accent `#4a90d9`)
-- `logo.png` — plugin icon (referenced by `manifest.json`)
+## 文字排版
 
-The flow: Eagle launches plugin → `eagle.onPluginCreate` grabs selected items → renders thumbnail list on the left → user crops each image with Cropper.js (locked 1:1) → draggable text overlay for positioning → `getCroppedCanvas` renders to 300x300 → text drawn via Canvas → buffer written to temp file → `eagle.item.addFromPath` imports back into Eagle → `closeAndFocus()` focuses Eagle main window and opens target folder.
+- 字体选项来自固定白名单。
+- 多行及长文本换行规则在预览与导出中保持一致。
+- 图层位置以裁剪区域 0–1 归一化坐标保存。
+- 画布拖拽不能因重建 DOM 而丢失 pointer capture。
 
-## Key Technical Details
+## 开发要求
 
-- **Eagle Plugin API**: `eagle.onPluginCreate` for init, `eagle.item.getSelected()` for batch input, `eagle.item.addFromPath()` for save, `eagle.item.moveToTrash()` for optional delete, `eagle.mainWindow.focus()` + `eagle.folder.open()` for post-save focus
-- **Image loading**: uses `file://` protocol on `item.filePath` — requires Eagle permission
-- **Cropper.js**: locked `aspectRatio: 1/1`, `viewMode: 1`, `autoCropArea: 1`. Also uses `rotate()`, `scaleX()` for flip, and `crop` event for live preview
-- **Output**: always 300x300px; JPG at quality 0.8 or PNG lossless
-- **Settings persistence**: `localStorage` key `wechat_sticker_settings` (format, tags, folder ID, delete-original, text content/size/color/position/stroke)
-- **Text overlay**: draggable `<div>` positioned via `textPos` relative coordinates (0–1); synced to crop box via `positionOverlay()`. Rendered via Canvas `fillText`/`strokeText` on export. Font: bold Microsoft YaHei/PingFang SC. Style (size, color, stroke) synced in real-time from controls.
-- **Thumbnail list**: 80px left sidebar showing all selected items. Click to navigate. Completed items get a checkmark (`.done` class).
-- **Settings panel**: export settings section hides after first use (checks localStorage); toggle button (⚙) in header to show/hide. Text settings + preview in `.controls-fixed` are always visible. Action buttons always visible at bottom.
+- UI、注释和文档使用中文。
+- 优先修复真实问题，不堆叠无意义防御性代码。
+- 修改 Eagle API 调用前核对 API 返回语义。
+- 不改变插件 ID。
+- 功能变化时同步更新 README、manifest 和静态检查。
 
-## Constraints
+## 验证
 
-- UI text, comments, and docs must be in **中文**
-- Image output is hardcoded to **300x300px** — do not change
-- Crop aspect ratio is hardcoded to **1:1** — do not change
-- External dependency (Cropper.js 1.5.13) loaded via CDN — no package manager
-- No build, lint, or test commands exist; changes are live-reloaded by Eagle
+执行 `npm run check`；此外必须在 Eagle 实际环境测试多图层拖拽、图层切换、模板保存/应用/删除、PNG/JPG 导出、文件大小限制、队列状态和原图保护。静态检查不能代替真实桌面回归。
 
-## Release Workflow
+## 发布
 
-发布新版本的完整流程：
-
-1. **提交代码** — 确保所有改动已 commit 并 push 到 GitHub
-   ```bash
-   git add -A
-   git commit -m "vX.Y.Z: 版本说明"
-   git push
-   ```
-
-2. **打包插件文件** — 将以下 5 个必需文件打成 zip：
-   - `manifest.json`、`index.html`、`logo.png`、`script.js`、`style.css`
-   ```bash
-   zip -j wechat-sticker-pro-vX.Y.Z.zip manifest.json index.html logo.png script.js style.css
-   ```
-
-3. **创建 Release** — 使用 `gh release create` 发布并上传附件
-   ```bash
-   gh release create vX.Y.Z wechat-sticker-pro-vX.Y.Z.zip \
-     --title "vX.Y.Z" \
-     --notes "版本说明"
-   ```
+发布包包含 manifest.json、index.html、logo.png、script.js、style.css 及 vendor/cropperjs/。保留依赖许可证。

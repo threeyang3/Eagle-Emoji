@@ -1,27 +1,24 @@
-# WeChat Sticker Pro (微信表情包大师) - Project Instructions
+# 微信表情包大师 - 项目开发说明
 
-## 概述
-这是一个为 Eagle 设计的窗口插件，旨在快速将选中的图片处理为符合微信规范的表情包。
+这是一个运行在 Eagle 中的 300 × 300 px 表情包编辑插件。
 
-## 技术栈
-- **UI**: 原生 HTML/CSS (Eagle 原生风格，浅灰底 + 蓝色主色)。
-- **核心库**: [Cropper.js](https://github.com/fengyuanchen/cropperjs) (裁剪)。
-- **逻辑**: JavaScript (Canvas API 处理图像，Node.js `fs` 处理文件)。
-- **API**: [Eagle Plugin API](https://developer.eagle.cool/plugin-api)。
+## 技术结构
+- 原生 HTML/CSS/JavaScript。
+- 本地 Cropper.js 1.5.13（MIT License）。
+- Canvas API 图像合成。
+- Node.js 文件操作与 Eagle Plugin API。
 
-## 规范与红线
-- **语言**: UI、注释和文档必须使用 **中文**。
-- **图像尺寸**: 强制导出为 **300x300px**。
-- **裁剪比例**: 强制锁定为 **1:1**。
-- **依赖**: 优先使用 CDN 链接（目前使用 cdnjs），如需离线化需另行说明。
+## 必须遵守
+- 裁剪比例 1:1，导出尺寸 300 × 300 px。
+- 支持多文字图层；每层独立内容、位置和样式。
+- 预览和导出使用相同图层数据与排版规则。
+- 样式模板仅保存样式属性，不覆盖文字内容和位置。
+- 导出文件大小限制在导入前检查；JPG 可逐步压缩，PNG 超限必须提示。
+- 原图删除默认关闭，只有新文件导入成功后才尝试移入回收站。
+- 导入成功但回收站失败时不得重复导入。
+- 临时文件在 finally 中清理。
+- 不上传用户素材。
+- UI、注释和文档使用中文。
 
-## 常用命令与路径
-- **插件入口**: `index.html`
-- **配置文件**: `manifest.json`
-- **逻辑脚本**: `script.js`
-- **样式表**: `style.css`
-
-## 已知局限
-- 使用 `file://` 协议加载本地图片，需确保 Eagle 权限允许。
-- 批量处理依赖于 `eagle.item.getSelected()` 的初始列表，处理期间无法动态增删。
-- 文字浮层位置基于裁剪框坐标，裁剪框移动时文字会跟随。
+## 验证
+运行 `npm run check`，并在 Eagle 实际环境测试图层拖拽、模板管理、PNG/JPG、大小限制、队列及原图安全。
