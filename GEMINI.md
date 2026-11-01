@@ -7,7 +7,7 @@
 ## 技术结构
 
 - 界面：原生 HTML/CSS。
-- 图片裁剪：Cropper.js 1.5.13。
+- 图片裁剪：本地打包的 Cropper.js 1.5.13（MIT License）。
 - 图像合成：Canvas API。
 - 文件操作：Node.js fs、path、os、url。
 - 素材导入与管理：Eagle Plugin API。
