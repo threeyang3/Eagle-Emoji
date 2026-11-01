@@ -143,8 +143,8 @@ async function processAndSave() {
  if(!cropper)throw new Error('图片尚未准备好，请稍后重试。');
  const canvas=cropper.getCroppedCanvas({width:OUTPUT_SIZE,height:OUTPUT_SIZE,imageSmoothingEnabled:true,imageSmoothingQuality:'high'});
  if(!canvas)throw new Error('无法生成裁剪结果。');
- drawTextOnCanvas(canvas);
  const format=elements.format.value==='image/jpeg'?'image/jpeg':'image/png';
+ drawTextOnCanvas(canvas,format==='image/jpeg'?'#ffffff':null);
  const extension=format==='image/jpeg'?'jpg':'png';
  const buffer=await canvasToBuffer(canvas,format,format==='image/jpeg'?Number(elements.jpegQuality.value)/100:undefined);
  const tempFilePath=path.join(os.tmpdir(),'eagle-sticker-'+Date.now()+'-'+Math.random().toString(36).slice(2)+'.'+extension);
@@ -174,9 +174,11 @@ function canvasToBuffer(canvas,format,quality) {
   },format,quality);
  });
 }
-function drawTextOnCanvas(canvas) {
+function drawTextOnCanvas(canvas, matteColor=null) {
+ const ctx=canvas.getContext('2d');
+ if(matteColor){ctx.save();ctx.fillStyle=matteColor;ctx.fillRect(0,0,canvas.width,canvas.height);ctx.restore();}
  const text=elements.textContent.value.trim(); if(!text)return;
- const ctx=canvas.getContext('2d'),fontSize=Number(elements.textSize.value)||28;
+ const fontSize=Number(elements.textSize.value)||28;
  const font=elements.fontFamily.value||'Microsoft YaHei';
  ctx.save();ctx.font='bold '+fontSize+'px "'+font+'", "PingFang SC", sans-serif';
  ctx.textAlign='center';ctx.textBaseline='middle';ctx.lineJoin='round';
@@ -215,7 +217,7 @@ function updatePreview() {
   if(!cropper)return;
   try{
    const canvas=cropper.getCroppedCanvas({width:OUTPUT_SIZE,height:OUTPUT_SIZE,imageSmoothingEnabled:true,imageSmoothingQuality:'high'});
-   if(!canvas)return;drawTextOnCanvas(canvas);elements.previewImg.src=canvas.toDataURL('image/png');
+   if(!canvas)return;drawTextOnCanvas(canvas,elements.format.value==='image/jpeg'?'#ffffff':null);elements.previewImg.src=canvas.toDataURL('image/png');
   }catch(error){console.warn('预览更新失败：',error);}
  },80);
 }
