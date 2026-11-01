@@ -337,6 +337,7 @@ function setProcessing(processing) {
  [elements.addLayer,elements.saveTemplate,elements.applyTemplate,elements.deleteTemplate].forEach(button=>{if(button)button.disabled=processing;});
  elements.deleteLayer.disabled=processing||!activeLayerId;
  [elements.textContent,elements.textSize,elements.textColor,elements.textStroke,elements.fontFamily,elements.strokeWidth,elements.textBackground,elements.textBackgroundColor].forEach(input=>{if(input)input.disabled=processing||!getActiveLayer();});
+ [elements.format,elements.jpegQuality,elements.maxFileSize,elements.deleteOriginal,elements.tags,elements.folderId,elements.templateSelect].forEach(input=>{if(input)input.disabled=processing;});
 }
 function saveSettings() {
  const settings={
