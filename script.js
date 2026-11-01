@@ -8,6 +8,8 @@ let cropper = null, selectedItems = [], currentIndex = 0;
 let textPos = { x: 0.5, y: 0.82 }, isDragging = false, dragPointerId = null;
 let dragOffset = { x: 0, y: 0 }, previewTimer = null, loadToken = 0, isProcessing = false;
 const completedIndexes = new Set();
+const itemEdits = new Map();
+let activeItemIndex = -1;
 const $ = (id) => document.getElementById(id);
 const elements = {
  image:$('image-to-crop'), currentIndex:$('current-index'), totalCount:$('total-count'),
@@ -69,6 +71,7 @@ function bindControls() {
 
 async function showItem(index, allowProcessing = false) {
  if ((isProcessing && !allowProcessing) || index<0 || index>=selectedItems.length) return;
+ if(cropper && activeItemIndex>=0){try{itemEdits.set(activeItemIndex,cropper.getData());}catch(error){console.warn('保存当前裁剪状态失败：',error);}}
  currentIndex=index; const token=++loadToken; destroyCropper();
  elements.currentIndex.textContent=String(index+1);
  elements.prevBtn.disabled=index===0;
@@ -82,7 +85,7 @@ async function showItem(index, allowProcessing = false) {
   await imageReady; if (token!==loadToken) return;
   cropper=new Cropper(elements.image,{
    aspectRatio:1,viewMode:1,autoCropArea:1,responsive:true,background:false,
-   ready(){if(token!==loadToken)return;syncOverlayStyle();updateOverlayContent();positionOverlay();updatePreview();},
+   ready(){if(token!==loadToken)return;const savedEdit=itemEdits.get(index);if(savedEdit)cropper.setData(savedEdit);activeItemIndex=index;syncOverlayStyle();updateOverlayContent();positionOverlay();updatePreview();},
    crop(){if(token!==loadToken)return;positionOverlay();updatePreview();}
   });
  } catch(error) {
@@ -124,7 +127,8 @@ function updateThumbState() {
 async function handleSaveAndNext() {
  if(isProcessing||!cropper)return; setProcessing(true);
  try {
-  await processAndSave(); completedIndexes.add(currentIndex); updateThumbState();
+  const saveResult=await processAndSave(); completedIndexes.add(currentIndex); updateThumbState();
+  if(saveResult&&saveResult.warning)alert('表情包已成功导入，但原图未能移入回收站：'+saveResult.warning);
   if(currentIndex<selectedItems.length-1){await showItem(currentIndex+1,true);}
   else {alert('全部处理完成！成功处理 '+completedIndexes.size+' 张图片。');await closeAndFocus();}
  } catch(error) {
@@ -151,8 +155,13 @@ async function processAndSave() {
   const folderId=elements.folderId.value.trim(); if(folderId)options.folderId=folderId;
   await eagle.item.addFromPath(tempFilePath,options);
   // addFromPath 成功完成后才允许将原图移入回收站。
-  if(elements.deleteOriginal.checked)await eagle.item.moveToTrash([originalItem.id]);
+  let warning=null;
+  if(elements.deleteOriginal.checked){
+   try{await eagle.item.moveToTrash([originalItem.id]);}
+   catch(error){warning=getErrorMessage(error);console.warn('表情包已导入，但原图移入回收站失败：',error);}
+  }
   saveSettings();
+  return {warning};
  } finally {
   try{await fs.promises.unlink(tempFilePath);}catch(error){console.warn('临时文件清理失败：',error);}
  }
