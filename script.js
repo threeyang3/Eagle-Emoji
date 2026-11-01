@@ -10,6 +10,10 @@ let dragOffset = { x: 0, y: 0 }, previewTimer = null, loadToken = 0, isProcessin
 const completedIndexes = new Set();
 const itemEdits = new Map();
 let activeItemIndex = -1;
+let textLayers = [];
+let activeLayerId = null;
+let templates = [];
+let dragLayerId = null;
 const $ = (id) => document.getElementById(id);
 const elements = {
  image:$('image-to-crop'), currentIndex:$('current-index'), totalCount:$('total-count'),
@@ -21,12 +25,15 @@ const elements = {
  textStroke:$('text-stroke'), textOverlay:$('text-overlay'), thumbList:$('thumb-list'),
  fontFamily:$('font-family'), strokeWidth:$('stroke-width'), strokeWidthValue:$('stroke-width-value'),
  textBackground:$('text-background'), textBackgroundColor:$('text-background-color'),
- jpegQuality:$('jpeg-quality'), jpegQualityValue:$('jpeg-quality-value'), qualityGroup:$('quality-group')
+ jpegQuality:$('jpeg-quality'), jpegQualityValue:$('jpeg-quality-value'), qualityGroup:$('quality-group'), maxFileSize:$('max-file-size'), maxFileSizeValue:$('max-file-size-value'),
+ layerList:$('text-layer-list'), addLayer:$('add-text-layer'), deleteLayer:$('delete-text-layer'),
+ templateSelect:$('text-template'), saveTemplate:$('save-template'), applyTemplate:$('apply-template')
 };
 
 eagle.onPluginCreate(async () => {
  try {
-  loadSettings(); bindControls(); initDrag();
+  loadSettings(); loadTemplates(); bindControls(); initDrag();
+  renderLayerList(); syncLayerControls();
   selectedItems = await eagle.item.getSelected();
   if (!Array.isArray(selectedItems) || !selectedItems.length) {
    alert('请先在 Eagle 中选择至少一张图片。'); await closeAndFocus(); return;
@@ -41,20 +48,26 @@ eagle.onPluginCreate(async () => {
 
 function bindControls() {
  elements.settingsToggle.addEventListener('click', () => { elements.settingsScroll.classList.toggle('hidden-sidebar'); saveSettings(); });
+ elements.addLayer.addEventListener('click', addTextLayer);
+ elements.deleteLayer.addEventListener('click', deleteActiveLayer);
+ elements.saveTemplate.addEventListener('click', saveCurrentTemplate);
+ elements.applyTemplate.addEventListener('click', applySelectedTemplate);
+ elements.maxFileSize.addEventListener('input', () => { elements.maxFileSizeValue.textContent=elements.maxFileSize.value; saveSettings(); });
  elements.textSize.addEventListener('input', () => {
   elements.textSizeValue.textContent = elements.textSize.value;
-  syncOverlayStyle(); updatePreview(); saveSettings();
+  readStyleControls(); syncOverlayStyle(); updatePreview(); saveSettings();
  });
  [elements.textColor,elements.textStroke,elements.fontFamily,elements.strokeWidth,elements.textBackground,elements.textBackgroundColor,elements.jpegQuality].forEach(el => {
-  el.addEventListener('input', () => { syncOverlayStyle(); updatePreview(); saveSettings(); });
+  el.addEventListener('input', () => { readStyleControls(); syncOverlayStyle(); updatePreview(); saveSettings(); });
   el.addEventListener('change', saveSettings);
  });
- elements.strokeWidth.addEventListener('input', () => { elements.strokeWidthValue.textContent=elements.strokeWidth.value; syncOverlayStyle(); updatePreview(); saveSettings(); });
+ elements.strokeWidth.addEventListener('input', () => { elements.strokeWidthValue.textContent=elements.strokeWidth.value; readStyleControls(); syncOverlayStyle(); updatePreview(); saveSettings(); });
  elements.jpegQuality.addEventListener('input', () => { elements.jpegQualityValue.textContent=elements.jpegQuality.value; updatePreview(); saveSettings(); });
  elements.format.addEventListener('change', updateQualityVisibility);
  updateQualityVisibility();
  elements.textContent.addEventListener('input', () => {
-  updateOverlayContent(); positionOverlay(); updatePreview(); saveSettings();
+  const layer=getActiveLayer(); if(!layer)return; layer.text=elements.textContent.value;
+  updateOverlayContent(); positionOverlay(); renderLayerList(); updatePreview(); saveSettings();
  });
  [elements.format,elements.deleteOriginal,elements.tags,elements.folderId].forEach(el => {
   el.addEventListener('change', saveSettings); el.addEventListener('input', saveSettings);
