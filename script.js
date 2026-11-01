@@ -60,8 +60,8 @@ function bindControls() {
  });
 }
 
-async function showItem(index) {
- if (isProcessing || index<0 || index>=selectedItems.length) return;
+async function showItem(index, allowProcessing = false) {
+ if ((isProcessing && !allowProcessing) || index<0 || index>=selectedItems.length) return;
  currentIndex=index; const token=++loadToken; destroyCropper();
  elements.currentIndex.textContent=String(index+1);
  elements.prevBtn.disabled=index===0;
@@ -118,7 +118,7 @@ async function handleSaveAndNext() {
  if(isProcessing||!cropper)return; setProcessing(true);
  try {
   await processAndSave(); completedIndexes.add(currentIndex); updateThumbState();
-  if(currentIndex<selectedItems.length-1){setProcessing(false);await showItem(currentIndex+1);}
+  if(currentIndex<selectedItems.length-1){await showItem(currentIndex+1,true);}
   else {alert('全部处理完成！成功处理 '+completedIndexes.size+' 张图片。');await closeAndFocus();}
  } catch(error) {
   console.error('保存失败：',error); alert('保存失败，原图未删除。\n'+getErrorMessage(error));
