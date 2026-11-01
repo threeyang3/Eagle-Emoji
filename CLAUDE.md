@@ -45,4 +45,4 @@
 
 ## 发布
 
-发布前更新 manifest.json 版本及 README；必须在 Eagle 实际环境完成验证后再创建 GitHub Release。运行包至少包含 manifest.json、index.html、logo.png、script.js、style.css。
+发布前更新 manifest.json 版本及 README；必须在 Eagle 实际环境完成验证后再创建 GitHub Release。运行包至少包含 manifest.json、index.html、logo.png、script.js、style.css 及 vendor/cropperjs/ 目录。
