@@ -73,6 +73,7 @@ async function showItem(index, allowProcessing = false) {
  if ((isProcessing && !allowProcessing) || index<0 || index>=selectedItems.length) return;
  if(cropper && activeItemIndex>=0){try{itemEdits.set(activeItemIndex,cropper.getData());}catch(error){console.warn('保存当前裁剪状态失败：',error);}}
  currentIndex=index; const token=++loadToken; destroyCropper();
+ elements.nextBtn.disabled=true;
  elements.currentIndex.textContent=String(index+1);
  elements.prevBtn.disabled=index===0;
  elements.nextBtn.textContent=index===selectedItems.length-1?'保存并完成':'保存并下一个';
@@ -85,7 +86,7 @@ async function showItem(index, allowProcessing = false) {
   await imageReady; if (token!==loadToken) return;
   cropper=new Cropper(elements.image,{
    aspectRatio:1,viewMode:1,autoCropArea:1,responsive:true,background:false,
-   ready(){if(token!==loadToken)return;const savedEdit=itemEdits.get(index);if(savedEdit)cropper.setData(savedEdit);activeItemIndex=index;syncOverlayStyle();updateOverlayContent();positionOverlay();updatePreview();},
+   ready(){if(token!==loadToken)return;const savedEdit=itemEdits.get(index);if(savedEdit)cropper.setData(savedEdit);activeItemIndex=index;elements.nextBtn.disabled=isProcessing;syncOverlayStyle();updateOverlayContent();positionOverlay();updatePreview();},
    crop(){if(token!==loadToken)return;positionOverlay();updatePreview();}
   });
  } catch(error) {
@@ -224,7 +225,7 @@ function updatePreview() {
 }
 function setProcessing(processing) {
  isProcessing=processing;elements.loadingOverlay.classList.toggle('hidden',!processing);
- elements.nextBtn.disabled=processing;elements.prevBtn.disabled=processing||currentIndex===0;
+ elements.nextBtn.disabled=processing||!cropper;elements.prevBtn.disabled=processing||currentIndex===0;
  elements.skipBtn.disabled=processing;elements.settingsToggle.disabled=processing;
  elements.thumbList.querySelectorAll('button').forEach(button=>button.disabled=processing);
 }
