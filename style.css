@@ -304,6 +304,7 @@ main {
 
  .control-group textarea {
     min-height: 48px;
+    height: auto;
     padding: 6px 8px;
     resize: vertical;
     line-height: 1.4;
@@ -394,6 +395,7 @@ main {
     white-space: pre-line;
     max-width: 90%;
     overflow-wrap: anywhere;
+    word-break: break-all;
     touch-action: none;
     transform: translate(-50%, -50%);
     z-index: 10;
