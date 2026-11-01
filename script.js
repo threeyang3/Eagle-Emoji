@@ -181,7 +181,7 @@ function drawTextOnCanvas(canvas) {
  ctx.save();ctx.font='bold '+fontSize+'px "'+font+'", "PingFang SC", sans-serif';
  ctx.textAlign='center';ctx.textBaseline='middle';ctx.lineJoin='round';
  const x=clamp(textPos.x,0,1)*canvas.width,y=clamp(textPos.y,0,1)*canvas.height;
- const lines=text.split(/\r?\n/),lineHeight=fontSize*1.2,startY=y-((lines.length-1)*lineHeight)/2;
+ const lines=wrapCanvasText(ctx,text,OUTPUT_SIZE-24),lineHeight=fontSize*1.2,startY=y-((lines.length-1)*lineHeight)/2;
  const metrics=lines.map(line=>ctx.measureText(line).width),padding=fontSize*0.28;
  if(elements.textBackground.checked){
   const boxWidth=Math.max(...metrics)+padding*2,boxHeight=lines.length*lineHeight+padding*2;
@@ -194,6 +194,20 @@ function drawTextOnCanvas(canvas) {
   ctx.fillStyle=elements.textColor.value;ctx.fillText(line,x,lineY);
  });
  ctx.restore();
+}
+function wrapCanvasText(ctx,text,maxWidth) {
+ const result=[];
+ text.split(/\r?\n/).forEach(paragraph=>{
+  if(!paragraph){result.push('');return;}
+  let line='';
+  for(const character of Array.from(paragraph)){
+   const candidate=line+character;
+   if(line&&ctx.measureText(candidate).width>maxWidth){result.push(line);line=character;}
+   else line=candidate;
+  }
+  result.push(line);
+ });
+ return result;
 }
 function updatePreview() {
  if(!cropper)return;clearTimeout(previewTimer);
@@ -277,7 +291,11 @@ function positionOverlay() {
  overlay.classList.remove('hidden');
  overlay.style.left=(box.left+textPos.x*box.width)+'px';
  overlay.style.top=(box.top+textPos.y*box.height)+'px';
- overlay.style.fontSize=(Number(elements.textSize.value)*box.width/OUTPUT_SIZE)+'px';
+ const scale=box.width/OUTPUT_SIZE;
+ overlay.style.fontSize=(Number(elements.textSize.value)*scale)+'px';
+ overlay.style.padding=(Number(elements.textSize.value)*0.28*scale)+'px '+(Number(elements.textSize.value)*0.28*scale)+'px';
+ overlay.style.maxWidth=(box.width*0.92)+'px';
+ overlay.style.webkitTextStroke=elements.textStroke.checked?(Number(elements.strokeWidth.value)*scale+'px #000'):'0 transparent';
 }
 function syncOverlayStyle() {
  elements.textOverlay.style.color=elements.textColor.value;
