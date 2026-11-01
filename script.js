@@ -28,7 +28,7 @@ const elements = {
  textBackground:$('text-background'), textBackgroundColor:$('text-background-color'),
  jpegQuality:$('jpeg-quality'), jpegQualityValue:$('jpeg-quality-value'), qualityGroup:$('quality-group'), maxFileSize:$('max-file-size'), maxFileSizeValue:$('max-file-size-value'),
  layerList:$('text-layer-list'), addLayer:$('add-text-layer'), deleteLayer:$('delete-text-layer'),
- templateSelect:$('text-template'), saveTemplate:$('save-template'), applyTemplate:$('apply-template')
+ templateSelect:$('text-template'), saveTemplate:$('save-template'), applyTemplate:$('apply-template'), deleteTemplate:$('delete-template')
 };
 
 eagle.onPluginCreate(async () => {
@@ -53,6 +53,7 @@ function bindControls() {
  elements.deleteLayer.addEventListener('click', deleteActiveLayer);
  elements.saveTemplate.addEventListener('click', saveCurrentTemplate);
  elements.applyTemplate.addEventListener('click', applySelectedTemplate);
+ elements.deleteTemplate.addEventListener('click', deleteSelectedTemplate);
  elements.maxFileSize.addEventListener('input', () => { elements.maxFileSizeValue.textContent=elements.maxFileSize.value; saveSettings(); });
  elements.textSize.addEventListener('input', () => {
   elements.textSizeValue.textContent = elements.textSize.value;
@@ -129,6 +130,10 @@ function saveCurrentTemplate() {
  const name=prompt('为当前文字样式模板命名：');if(!name||!name.trim())return;
  templates.push({id:createLayerId(),name:name.trim(),style:{size:layer.size,color:layer.color,fontFamily:layer.fontFamily,stroke:layer.stroke,strokeWidth:layer.strokeWidth,background:layer.background,backgroundColor:layer.backgroundColor}});
  persistTemplates();renderTemplateOptions();
+}
+function deleteSelectedTemplate() {
+ const id=elements.templateSelect.value;if(!id)return;
+ templates=templates.filter(template=>template.id!==id);persistTemplates();renderTemplateOptions();
 }
 function applySelectedTemplate() {
  const template=templates.find(item=>item.id===elements.templateSelect.value),layer=getActiveLayer();
@@ -374,7 +379,7 @@ function initDrag() {
   const node=event.target.closest('.text-layer-overlay');
   if(!node||!cropper||isProcessing)return;
   event.preventDefault();activeLayerId=node.dataset.layerId;dragLayerId=activeLayerId;
-  selectLayer(activeLayerId);node.setPointerCapture(event.pointerId);
+  renderLayerList();syncLayerControls();node.setPointerCapture(event.pointerId);
   const rect=node.getBoundingClientRect();
   dragOffset={x:event.clientX-(rect.left+rect.width/2),y:event.clientY-(rect.top+rect.height/2)};
   node.classList.add('dragging');
