@@ -334,6 +334,8 @@ function setProcessing(processing) {
  elements.nextBtn.disabled=processing||!cropper;elements.prevBtn.disabled=processing||currentIndex===0;
  elements.skipBtn.disabled=processing;elements.settingsToggle.disabled=processing;
  elements.thumbList.querySelectorAll('button').forEach(button=>button.disabled=processing);
+ [elements.addLayer,elements.deleteLayer,elements.saveTemplate,elements.applyTemplate,elements.deleteTemplate].forEach(button=>{if(button)button.disabled=processing;});
+ [elements.textContent,elements.textSize,elements.textColor,elements.textStroke,elements.fontFamily,elements.strokeWidth,elements.textBackground,elements.textBackgroundColor].forEach(input=>{if(input)input.disabled=processing||!getActiveLayer();});
 }
 function saveSettings() {
  const settings={
