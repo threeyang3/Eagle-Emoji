@@ -82,6 +82,74 @@ function bindControls() {
  });
 }
 
+
+function getActiveLayer() { return textLayers.find(layer=>layer.id===activeLayerId)||null; }
+function createLayerId() { return 'layer-'+Date.now()+'-'+Math.random().toString(36).slice(2,7); }
+function addTextLayer() {
+ const layer={id:createLayerId(),text:'新文字',x:0.5,y:0.5,size:28,color:'#ffffff',fontFamily:'Microsoft YaHei',stroke:true,strokeWidth:3,background:false,backgroundColor:'#000000'};
+ textLayers.push(layer);activeLayerId=layer.id;renderLayerList();syncLayerControls();positionOverlay();updatePreview();saveSettings();
+}
+function deleteActiveLayer() {
+ if(!activeLayerId)return;textLayers=textLayers.filter(layer=>layer.id!==activeLayerId);
+ activeLayerId=textLayers.length?textLayers[textLayers.length-1].id:null;
+ renderLayerList();syncLayerControls();positionOverlay();updatePreview();saveSettings();
+}
+function selectLayer(id) {
+ if(!textLayers.some(layer=>layer.id===id))return;activeLayerId=id;renderLayerList();syncLayerControls();positionOverlay();
+}
+function renderLayerList() {
+ elements.layerList.replaceChildren();
+ textLayers.forEach((layer,index)=>{
+  const button=document.createElement('button');button.type='button';
+  button.className='layer-list-item'+(layer.id===activeLayerId?' active':'');
+  button.textContent=(index+1)+'. '+(layer.text.trim()||'（空文字图层）');
+  button.addEventListener('click',()=>selectLayer(layer.id));elements.layerList.appendChild(button);
+ });
+ elements.deleteLayer.disabled=!activeLayerId||isProcessing;
+}
+function syncLayerControls() {
+ const layer=getActiveLayer();
+ [elements.textContent,elements.textSize,elements.textColor,elements.textStroke,elements.fontFamily,elements.strokeWidth,elements.textBackground,elements.textBackgroundColor].forEach(el=>el.disabled=!layer||isProcessing);
+ if(!layer){elements.textContent.value='';return;}
+ elements.textContent.value=layer.text;elements.textSize.value=layer.size;elements.textSizeValue.textContent=layer.size;
+ elements.textColor.value=layer.color;elements.textStroke.checked=layer.stroke;elements.fontFamily.value=layer.fontFamily;
+ elements.strokeWidth.value=layer.strokeWidth;elements.strokeWidthValue.textContent=layer.strokeWidth;
+ elements.textBackground.checked=layer.background;elements.textBackgroundColor.value=layer.backgroundColor;
+}
+function readStyleControls() {
+ const layer=getActiveLayer();if(!layer)return;
+ layer.size=clamp(Number(elements.textSize.value)||28,12,96);layer.color=elements.textColor.value;
+ layer.stroke=elements.textStroke.checked;layer.fontFamily=['Microsoft YaHei','Arial','serif','sans-serif'].includes(elements.fontFamily.value)?elements.fontFamily.value:'Microsoft YaHei';
+ layer.strokeWidth=clamp(Number(elements.strokeWidth.value)||0,0,12);layer.background=elements.textBackground.checked;
+ layer.backgroundColor=elements.textBackgroundColor.value;
+}
+function saveCurrentTemplate() {
+ const layer=getActiveLayer();if(!layer){alert('请先添加或选择一个文字图层。');return;}
+ const name=prompt('为当前文字样式模板命名：');if(!name||!name.trim())return;
+ templates.push({id:createLayerId(),name:name.trim(),style:{size:layer.size,color:layer.color,fontFamily:layer.fontFamily,stroke:layer.stroke,strokeWidth:layer.strokeWidth,background:layer.background,backgroundColor:layer.backgroundColor}});
+ persistTemplates();renderTemplateOptions();
+}
+function applySelectedTemplate() {
+ const template=templates.find(item=>item.id===elements.templateSelect.value),layer=getActiveLayer();
+ if(!template||!layer){alert('请选择模板并选中一个文字图层。');return;}
+ Object.assign(layer,template.style);syncLayerControls();positionOverlay();updatePreview();saveSettings();
+}
+function loadTemplates() {
+ try{const saved=JSON.parse(localStorage.getItem('wechat_sticker_templates')||'[]');templates=Array.isArray(saved)?saved.filter(item=>item&&item.id&&item.name&&item.style):[];}
+ catch(error){templates=[];console.warn('读取文字模板失败：',error);}
+ renderTemplateOptions();
+}
+function persistTemplates() {
+ try{localStorage.setItem('wechat_sticker_templates',JSON.stringify(templates));}
+ catch(error){alert('模板保存失败：'+getErrorMessage(error));}
+}
+function renderTemplateOptions() {
+ const selected=elements.templateSelect.value;elements.templateSelect.replaceChildren();
+ const placeholder=document.createElement('option');placeholder.value='';placeholder.textContent='选择样式模板';elements.templateSelect.appendChild(placeholder);
+ templates.forEach(template=>{const option=document.createElement('option');option.value=template.id;option.textContent=template.name;elements.templateSelect.appendChild(option);});
+ if(templates.some(item=>item.id===selected))elements.templateSelect.value=selected;
+}
+
 async function showItem(index, allowProcessing = false) {
  if ((isProcessing && !allowProcessing) || index<0 || index>=selectedItems.length) return;
  if(cropper && activeItemIndex>=0){try{itemEdits.set(activeItemIndex,cropper.getData());}catch(error){console.warn('保存当前裁剪状态失败：',error);}}
