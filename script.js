@@ -180,7 +180,8 @@ function drawTextOnCanvas(canvas, matteColor=null) {
  const text=elements.textContent.value.trim(); if(!text)return;
  const fontSize=Number(elements.textSize.value)||28;
  const font=elements.fontFamily.value||'Microsoft YaHei';
- ctx.save();ctx.font='bold '+fontSize+'px "'+font+'", "PingFang SC", sans-serif';
+ const fontDeclaration=['serif','sans-serif'].includes(font)?font:'"'+font+'"';
+ ctx.save();ctx.font='bold '+fontSize+'px '+fontDeclaration+', "PingFang SC", sans-serif';
  ctx.textAlign='center';ctx.textBaseline='middle';ctx.lineJoin='round';
  const x=clamp(textPos.x,0,1)*canvas.width,y=clamp(textPos.y,0,1)*canvas.height;
  const lines=wrapCanvasText(ctx,text,OUTPUT_SIZE-24),lineHeight=fontSize*1.2,startY=y-((lines.length-1)*lineHeight)/2;
@@ -295,6 +296,7 @@ function positionOverlay() {
  overlay.style.top=(box.top+textPos.y*box.height)+'px';
  const scale=box.width/OUTPUT_SIZE;
  overlay.style.fontSize=(Number(elements.textSize.value)*scale)+'px';
+ overlay.style.lineHeight='1.2';
  overlay.style.padding=(Number(elements.textSize.value)*0.28*scale)+'px '+(Number(elements.textSize.value)*0.28*scale)+'px';
  overlay.style.maxWidth=(box.width*0.92)+'px';
  overlay.style.webkitTextStroke=elements.textStroke.checked?(Number(elements.strokeWidth.value)*scale+'px #000'):'0 transparent';
