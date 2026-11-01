@@ -16,7 +16,10 @@ const elements = {
  settingsScroll:$('settings-scroll'), settingsToggle:$('settings-toggle'), rotateLeft:$('rotate-left'),
  rotateRight:$('rotate-right'), flipH:$('flip-h'), previewImg:$('preview-img'), textContent:$('text-content'),
  textSize:$('text-size'), textSizeValue:$('text-size-value'), textColor:$('text-color'),
- textStroke:$('text-stroke'), textOverlay:$('text-overlay'), thumbList:$('thumb-list')
+ textStroke:$('text-stroke'), textOverlay:$('text-overlay'), thumbList:$('thumb-list'),
+ fontFamily:$('font-family'), strokeWidth:$('stroke-width'), strokeWidthValue:$('stroke-width-value'),
+ textBackground:$('text-background'), textBackgroundColor:$('text-background-color'),
+ jpegQuality:$('jpeg-quality'), jpegQualityValue:$('jpeg-quality-value'), qualityGroup:$('quality-group')
 };
 
 eagle.onPluginCreate(async () => {
@@ -40,10 +43,14 @@ function bindControls() {
   elements.textSizeValue.textContent = elements.textSize.value;
   syncOverlayStyle(); updatePreview(); saveSettings();
  });
- [elements.textColor,elements.textStroke].forEach(el => {
+ [elements.textColor,elements.textStroke,elements.fontFamily,elements.strokeWidth,elements.textBackground,elements.textBackgroundColor,elements.jpegQuality].forEach(el => {
   el.addEventListener('input', () => { syncOverlayStyle(); updatePreview(); saveSettings(); });
   el.addEventListener('change', saveSettings);
  });
+ elements.strokeWidth.addEventListener('input', () => { elements.strokeWidthValue.textContent=elements.strokeWidth.value; syncOverlayStyle(); updatePreview(); saveSettings(); });
+ elements.jpegQuality.addEventListener('input', () => { elements.jpegQualityValue.textContent=elements.jpegQuality.value; updatePreview(); saveSettings(); });
+ elements.format.addEventListener('change', updateQualityVisibility);
+ updateQualityVisibility();
  elements.textContent.addEventListener('input', () => {
   updateOverlayContent(); positionOverlay(); updatePreview(); saveSettings();
  });
@@ -135,7 +142,7 @@ async function processAndSave() {
  drawTextOnCanvas(canvas);
  const format=elements.format.value==='image/jpeg'?'image/jpeg':'image/png';
  const extension=format==='image/jpeg'?'jpg':'png';
- const buffer=await canvasToBuffer(canvas,format,format==='image/jpeg'?0.9:undefined);
+ const buffer=await canvasToBuffer(canvas,format,format==='image/jpeg'?Number(elements.jpegQuality.value)/100:undefined);
  const tempFilePath=path.join(os.tmpdir(),'eagle-sticker-'+Date.now()+'-'+Math.random().toString(36).slice(2)+'.'+extension);
  const originalItem=selectedItems[currentIndex];
  try {
@@ -161,13 +168,20 @@ function canvasToBuffer(canvas,format,quality) {
 function drawTextOnCanvas(canvas) {
  const text=elements.textContent.value.trim(); if(!text)return;
  const ctx=canvas.getContext('2d'),fontSize=Number(elements.textSize.value)||28;
- ctx.save();ctx.font='bold '+fontSize+'px "Microsoft YaHei", "PingFang SC", sans-serif';
+ const font=elements.fontFamily.value||'Microsoft YaHei';
+ ctx.save();ctx.font='bold '+fontSize+'px "'+font+'", "PingFang SC", sans-serif';
  ctx.textAlign='center';ctx.textBaseline='middle';ctx.lineJoin='round';
  const x=clamp(textPos.x,0,1)*canvas.width,y=clamp(textPos.y,0,1)*canvas.height;
  const lines=text.split(/\r?\n/),lineHeight=fontSize*1.2,startY=y-((lines.length-1)*lineHeight)/2;
+ const metrics=lines.map(line=>ctx.measureText(line).width),padding=fontSize*0.28;
+ if(elements.textBackground.checked){
+  const boxWidth=Math.max(...metrics)+padding*2,boxHeight=lines.length*lineHeight+padding*2;
+  ctx.fillStyle=elements.textBackgroundColor.value;
+  ctx.fillRect(x-boxWidth/2,y-boxHeight/2,boxWidth,boxHeight);
+ }
  lines.forEach((line,index)=>{
   const lineY=startY+index*lineHeight;
-  if(elements.textStroke.checked){ctx.lineWidth=Math.max(2,fontSize*0.12);ctx.strokeStyle='#000';ctx.strokeText(line,x,lineY);}
+  if(elements.textStroke.checked&&Number(elements.strokeWidth.value)>0){ctx.lineWidth=Number(elements.strokeWidth.value);ctx.strokeStyle='#000';ctx.strokeText(line,x,lineY);}
   ctx.fillStyle=elements.textColor.value;ctx.fillText(line,x,lineY);
  });
  ctx.restore();
@@ -193,6 +207,9 @@ function saveSettings() {
   format:elements.format.value,deleteOriginal:elements.deleteOriginal.checked,tags:elements.tags.value,
   folderId:elements.folderId.value,textContent:elements.textContent.value,textSize:elements.textSize.value,
   textColor:elements.textColor.value,textStroke:elements.textStroke.checked,
+  fontFamily:elements.fontFamily.value,strokeWidth:elements.strokeWidth.value,
+  textBackground:elements.textBackground.checked,textBackgroundColor:elements.textBackgroundColor.value,
+  jpegQuality:elements.jpegQuality.value,
   textPos:{x:textPos.x,y:textPos.y},settingsVisible:!elements.settingsScroll.classList.contains('hidden-sidebar')
  };
  try{localStorage.setItem(SETTINGS_KEY,JSON.stringify(settings));}catch(error){console.warn('保存设置失败：',error);}
@@ -206,6 +223,11 @@ function loadSettings() {
   elements.textSize.value=String(clamp(Number(s.textSize)||28,12,72));elements.textSizeValue.textContent=elements.textSize.value;
   elements.textColor.value=/^#[0-9a-f]{6}$/i.test(s.textColor||'')?s.textColor:'#ffffff';
   elements.textStroke.checked=s.textStroke!==false;
+  elements.fontFamily.value=['Microsoft YaHei','Arial','serif','sans-serif'].includes(s.fontFamily)?s.fontFamily:'Microsoft YaHei';
+  elements.strokeWidth.value=String(clamp(Number(s.strokeWidth??3),0,12));elements.strokeWidthValue.textContent=elements.strokeWidth.value;
+  elements.textBackground.checked=s.textBackground===true;
+  elements.textBackgroundColor.value=/^#[0-9a-f]{6}$/i.test(s.textBackgroundColor||'')?s.textBackgroundColor:'#000000';
+  elements.jpegQuality.value=String(clamp(Number(s.jpegQuality)||90,40,100));elements.jpegQualityValue.textContent=elements.jpegQuality.value;
   if(s.textPos&&Number.isFinite(s.textPos.x)&&Number.isFinite(s.textPos.y))
    textPos={x:clamp(s.textPos.x,0,1),y:clamp(s.textPos.y,0,1)};
   elements.settingsScroll.classList.toggle('hidden-sidebar',s.settingsVisible!==true);
@@ -250,13 +272,17 @@ function positionOverlay() {
 }
 function syncOverlayStyle() {
  elements.textOverlay.style.color=elements.textColor.value;
- elements.textOverlay.style.textShadow=elements.textStroke.checked?'0 0 2px #000, 1px 1px 2px #000, -1px -1px 2px #000':'none';
+ elements.textOverlay.style.fontFamily=elements.fontFamily.value;
+ elements.textOverlay.style.webkitTextStroke=elements.textStroke.checked?(Number(elements.strokeWidth.value)+'px #000'):'0 transparent';
+ elements.textOverlay.style.background=elements.textBackground.checked?elements.textBackgroundColor.value:'transparent';
+ elements.textOverlay.style.textShadow='none';
  positionOverlay();
 }
 function updateOverlayContent() {
  const text=elements.textContent.value.trim();elements.textOverlay.textContent=text;
  elements.textOverlay.classList.toggle('hidden',!text);
 }
+function updateQualityVisibility(){elements.qualityGroup.classList.toggle('hidden-control',elements.format.value!=='image/jpeg');}
 function clamp(value,min,max){return Math.min(max,Math.max(min,value));}
 function getErrorMessage(error){return error&&error.message?error.message:String(error||'未知错误');}
 async function closeAndFocus() {
