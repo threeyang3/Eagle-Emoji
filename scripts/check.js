@@ -19,6 +19,7 @@ try {
 
 try {
   new vm.Script(read('script.js'), { filename: 'script.js' });
+  new vm.Script(read('vendor/cropperjs/cropper.min.js'), { filename: 'cropper.min.js' });
 } catch (error) {
   errors.push('script.js 语法错误：' + error.message);
 }
@@ -38,6 +39,7 @@ assert(html.includes('vendor/cropperjs/cropper.min.js'), 'HTML 应加载本地 C
 assert(fs.existsSync(path.join(root, 'vendor/cropperjs/cropper.min.css')), '缺少 Cropper.js CSS');
 assert(fs.existsSync(path.join(root, 'vendor/cropperjs/cropper.min.js')), '缺少 Cropper.js JS');
 assert(fs.existsSync(path.join(root, 'vendor/cropperjs/LICENSE')), '缺少 Cropper.js MIT License');
+assert(!/cdnjs|jsdelivr|unpkg/.test(html), '运行界面不应依赖外部 CDN');
 assert(js.includes('const OUTPUT_SIZE = 300'), '导出尺寸必须保持 300 × 300');
 assert(js.includes('aspectRatio:1'), '裁剪比例必须保持 1:1');
 assert(js.includes('await eagle.item.addFromPath(tempFilePath,options)'), '缺少 Eagle 导入流程');
