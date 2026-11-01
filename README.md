@@ -48,6 +48,16 @@
 - 如导入或回收站操作失败，请检查 Eagle 权限、目标文件夹 ID 和磁盘空间。
 - Cropper.js 1.5.13 已随插件放在 `vendor/cropperjs/`，包含 MIT License；图片裁剪功能不再依赖外部 CDN，可离线运行。
 
+## 开发检查
+
+项目提供无第三方依赖的静态检查脚本。安装 Node.js 后，在项目根目录执行：
+
+```bash
+npm run check
+```
+
+该命令检查 manifest JSON、JavaScript 语法、脚本引用的 DOM ID、本地 Cropper.js 文件及关键数据安全约束。它不能替代 Eagle 内的真实交互测试。
+
 ## 项目结构
 
 | 文件 | 作用 |
