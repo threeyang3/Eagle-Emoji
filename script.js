@@ -229,7 +229,9 @@ async function processAndSave() {
  const format=elements.format.value==='image/jpeg'?'image/jpeg':'image/png';
  drawTextOnCanvas(canvas,format==='image/jpeg'?'#ffffff':null);
  const extension=format==='image/jpeg'?'jpg':'png';
- const buffer=await canvasToBuffer(canvas,format,format==='image/jpeg'?Number(elements.jpegQuality.value)/100:undefined);
+ const maxBytes=Number(elements.maxFileSize.value)*1024;
+ const encoded=await encodeWithSizeLimit(canvas,format,maxBytes);
+ const buffer=encoded.buffer;
  const tempFilePath=path.join(os.tmpdir(),'eagle-sticker-'+Date.now()+'-'+Math.random().toString(36).slice(2)+'.'+extension);
  const originalItem=selectedItems[currentIndex];
  try {
@@ -248,6 +250,19 @@ async function processAndSave() {
  } finally {
   try{await fs.promises.unlink(tempFilePath);}catch(error){console.warn('临时文件清理失败：',error);}
  }
+}
+async function encodeWithSizeLimit(canvas,format,maxBytes) {
+ let quality=Number(elements.jpegQuality.value)/100;
+ let buffer=await canvasToBuffer(canvas,format,format==='image/jpeg'?quality:undefined);
+ while(format==='image/jpeg'&&buffer.length>maxBytes&&quality>0.4){
+  quality=Math.max(0.4,Math.round((quality-0.05)*100)/100);
+  buffer=await canvasToBuffer(canvas,format,quality);
+ }
+ if(buffer.length>maxBytes){
+  const actual=(buffer.length/1024).toFixed(1),limit=(maxBytes/1024).toFixed(0);
+  throw new Error('导出文件为 '+actual+' KB，超过设定上限 '+limit+' KB。请提高文件大小上限、降低 JPG 质量或更换格式。');
+ }
+ return {buffer,quality};
 }
 function canvasToBuffer(canvas,format,quality) {
  return new Promise((resolve,reject)=>{
@@ -370,7 +385,7 @@ function initDrag() {
   const box=getCropBoxInPanel(panel),panelRect=panel.getBoundingClientRect();
   const cx=event.clientX-panelRect.left-dragOffset.x,cy=event.clientY-panelRect.top-dragOffset.y;
   layer.x=clamp((cx-box.left)/box.width,0,1);layer.y=clamp((cy-box.top)/box.height,0,1);
-  positionOverlay();updatePreview();
+  updateLayerOverlayPosition(layer);updatePreview();
  });
  const stop=()=>{if(!dragLayerId)return;dragLayerId=null;saveSettings();};
  host.addEventListener('pointerup',stop);host.addEventListener('pointercancel',stop);
@@ -381,6 +396,13 @@ function getCropBoxInPanel(panel) {
  const containerRect=elements.image.parentElement.getBoundingClientRect();
  const panelRect=panel.getBoundingClientRect();
  return {left:containerRect.left-panelRect.left+box.left,top:containerRect.top-panelRect.top+box.top,width:box.width,height:box.height};
+}
+function updateLayerOverlayPosition(layer) {
+ const node=elements.textOverlay.querySelector('[data-layer-id="'+layer.id+'"]');
+ if(!node||!cropper)return;
+ const box=getCropBoxInPanel(document.querySelector('.image-panel'));
+ node.style.left=(box.left+layer.x*box.width)+'px';
+ node.style.top=(box.top+layer.y*box.height)+'px';
 }
 function positionOverlay() {
  const host=elements.textOverlay;
