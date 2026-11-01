@@ -1,10 +1,10 @@
 {
   "id": "com.cctry.wechat-sticker-pro",
-  "version": "1.2.0",
+  "version": "1.3.0",
   "name": "微信表情包大师",
   "logo": "logo.png",
-  "description": "批量裁剪、文字排版并导出 300×300 微信表情包，支持每图裁剪记忆、PNG/JPG 及 Eagle 素材管理。",
-  "keywords": ["微信", "表情包", "图片裁剪", "文字排版", "批量处理"],
+  "description": "多图层文字编辑、样式模板、批量裁剪并导出 300×300 微信表情包，支持文件大小控制。",
+  "keywords": ["微信", "表情包", "多文字图层", "样式模板", "批量处理"],
   "platform": "all",
   "arch": "all",
   "devTools": false,
