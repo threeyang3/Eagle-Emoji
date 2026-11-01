@@ -34,7 +34,7 @@
                         <h3>文字</h3>
                         <div class="control-group">
                             <label for="text-content">文字内容：</label>
-                            <input type="text" id="text-content" placeholder="输入表情包文字（可含 emoji）">
+                            <textarea id="text-content" rows="2" placeholder="输入表情包文字，支持换行和 Emoji"></textarea>
                         </div>
                         <div class="control-group">
                             <label for="text-size">字号：<span id="text-size-value">28</span>px</label>
@@ -43,6 +43,25 @@
                         <div class="control-group">
                             <label for="text-color">文字颜色：</label>
                             <input type="color" id="text-color" value="#ffffff">
+                        </div>
+                        <div class="control-group">
+                            <label for="font-family">字体：</label>
+                            <select id="font-family">
+                                <option value="Microsoft YaHei">微软雅黑</option>
+                                <option value="Arial">Arial</option>
+                                <option value="serif">宋体/衬线</option>
+                                <option value="sans-serif">系统无衬线</option>
+                            </select>
+                        </div>
+                        <div class="control-group">
+                            <label for="stroke-width">描边宽度：<span id="stroke-width-value">3</span>px</label>
+                            <input type="range" id="stroke-width" min="0" max="12" value="3">
+                        </div>
+                        <div class="control-group">
+                            <label class="checkbox-label">
+                                <input type="checkbox" id="text-background"> 启用文字底色
+                            </label>
+                            <input type="color" id="text-background-color" value="#000000">
                         </div>
                         <div class="control-group">
                             <label>描边：</label>
@@ -70,6 +89,10 @@
                                 <option value="image/png">PNG (无损)</option>
                                 <option value="image/jpeg">JPG (压缩)</option>
                             </select>
+                        </div>
+                        <div class="control-group" id="quality-group">
+                            <label for="jpeg-quality">JPG 质量：<span id="jpeg-quality-value">90</span>%</label>
+                            <input type="range" id="jpeg-quality" min="40" max="100" value="90">
                         </div>
                         <div class="control-group">
                             <label>
