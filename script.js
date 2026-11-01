@@ -70,9 +70,9 @@ async function showItem(index) {
  const item=selectedItems[index];
  if (!item || !item.filePath) throw new Error('无法读取当前图片的文件路径。');
  elements.image.onload=null; elements.image.onerror=null;
- elements.image.src=pathToFileURL(path.resolve(item.filePath)).href;
+ const imageReady=waitForImage(elements.image, pathToFileURL(path.resolve(item.filePath)).href);
  try {
-  await waitForImage(elements.image); if (token!==loadToken) return;
+  await imageReady; if (token!==loadToken) return;
   cropper=new Cropper(elements.image,{
    aspectRatio:1,viewMode:1,autoCropArea:1,responsive:true,background:false,
    ready(){if(token!==loadToken)return;syncOverlayStyle();updateOverlayContent();positionOverlay();updatePreview();},
@@ -83,10 +83,12 @@ async function showItem(index) {
   alert('图片加载失败：'+getErrorMessage(error));
  }
 }
-function waitForImage(img) {
+function waitForImage(img, src) {
  return new Promise((resolve,reject)=>{
-  if(img.complete&&img.naturalWidth>0)return resolve();
-  img.onload=()=>resolve(); img.onerror=()=>reject(new Error('无法打开图片文件，请检查文件是否存在或可访问。'));
+  img.onload=()=>{img.onload=null;img.onerror=null;resolve();};
+  img.onerror=()=>{img.onload=null;img.onerror=null;reject(new Error('无法打开图片文件，请检查文件是否存在或可访问。'));};
+  img.src=src;
+  if(img.complete&&img.naturalWidth>0){img.onload=null;img.onerror=null;resolve();}
  });
 }
 function destroyCropper() {
