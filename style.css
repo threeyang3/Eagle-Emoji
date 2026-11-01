@@ -109,6 +109,10 @@ main {
 
 .thumb-item {
     position: relative;
+    height: 72px;
+    padding: 0;
+    background: transparent;
+    border: 2px solid transparent;
     width: 72px;
     height: 72px;
     border-radius: var(--radius);
@@ -371,7 +375,10 @@ main {
     text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.8);
     cursor: move;
     user-select: none;
-    white-space: nowrap;
+    white-space: pre-line;
+    max-width: 90%;
+    overflow-wrap: anywhere;
+    touch-action: none;
     transform: translate(-50%, -50%);
     z-index: 10;
     pointer-events: auto;
