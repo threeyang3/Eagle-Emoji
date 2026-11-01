@@ -4,6 +4,7 @@ const os = require('os');
 const { pathToFileURL } = require('url');
 const SETTINGS_KEY = 'wechat_sticker_settings';
 const DEFAULT_TEXT_LAYER = {text:'',x:0.5,y:0.82,size:28,color:'#ffffff',fontFamily:'Microsoft YaHei',stroke:true,strokeWidth:3,background:false,backgroundColor:'#000000'};
+const DEFAULT_TEXT_LAYER = {text:'',x:0.5,y:0.82,size:28,color:'#ffffff',fontFamily:'Microsoft YaHei',stroke:true,strokeWidth:3,background:false,backgroundColor:'#000000'};
 const OUTPUT_SIZE = 300;
 let cropper = null, selectedItems = [], currentIndex = 0;
 let textPos = { x: 0.5, y: 0.82 }, isDragging = false, dragPointerId = null;
@@ -429,16 +430,14 @@ function positionOverlay() {
  });
 }
 function syncOverlayStyle() {
- elements.textOverlay.style.color=elements.textColor.value;
- elements.textOverlay.style.fontFamily=elements.fontFamily.value;
- elements.textOverlay.style.webkitTextStroke=elements.textStroke.checked?(Number(elements.strokeWidth.value)+'px #000'):'0 transparent';
- elements.textOverlay.style.background=elements.textBackground.checked?elements.textBackgroundColor.value:'transparent';
- elements.textOverlay.style.textShadow='none';
+ readStyleControls();
  positionOverlay();
 }
 function updateOverlayContent() {
- const text=elements.textContent.value.trim();elements.textOverlay.textContent=text;
- elements.textOverlay.classList.toggle('hidden',!text);
+ const layer=getActiveLayer();
+ if(layer)layer.text=elements.textContent.value;
+ renderLayerList();
+ positionOverlay();
 }
 function updateQualityVisibility(){elements.qualityGroup.classList.toggle('hidden-control',elements.format.value!=='image/jpeg');}
 function clamp(value,min,max){return Math.min(max,Math.max(min,value));}
