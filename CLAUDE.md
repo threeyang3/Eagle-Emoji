@@ -43,6 +43,10 @@
 - 临时文件在成功和失败路径均尝试清理。
 - Eagle 重启后设置恢复。
 
+## 验证命令
+
+安装 Node.js 后可运行 `npm run check`。该检查覆盖 JSON、JS 语法、DOM 引用、本地 Cropper 资源及关键安全约束；不能替代 Eagle 真机回归。
+
 ## 发布
 
 发布前更新 manifest.json 版本及 README；必须在 Eagle 实际环境完成验证后再创建 GitHub Release。运行包至少包含 manifest.json、index.html、logo.png、script.js、style.css 及 vendor/cropperjs/ 目录。
