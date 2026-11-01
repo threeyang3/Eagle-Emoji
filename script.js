@@ -3,6 +3,7 @@ const path = require('path');
 const os = require('os');
 const { pathToFileURL } = require('url');
 const SETTINGS_KEY = 'wechat_sticker_settings';
+const DEFAULT_TEXT_LAYER = {text:'',x:0.5,y:0.82,size:28,color:'#ffffff',fontFamily:'Microsoft YaHei',stroke:true,strokeWidth:3,background:false,backgroundColor:'#000000'};
 const OUTPUT_SIZE = 300;
 let cropper = null, selectedItems = [], currentIndex = 0;
 let textPos = { x: 0.5, y: 0.82 }, isDragging = false, dragPointerId = null;
@@ -317,55 +318,63 @@ function setProcessing(processing) {
 function saveSettings() {
  const settings={
   format:elements.format.value,deleteOriginal:elements.deleteOriginal.checked,tags:elements.tags.value,
-  folderId:elements.folderId.value,textContent:elements.textContent.value,textSize:elements.textSize.value,
-  textColor:elements.textColor.value,textStroke:elements.textStroke.checked,
-  fontFamily:elements.fontFamily.value,strokeWidth:elements.strokeWidth.value,
-  textBackground:elements.textBackground.checked,textBackgroundColor:elements.textBackgroundColor.value,
-  jpegQuality:elements.jpegQuality.value,
-  textPos:{x:textPos.x,y:textPos.y},settingsVisible:!elements.settingsScroll.classList.contains('hidden-sidebar')
+  folderId:elements.folderId.value,jpegQuality:elements.jpegQuality.value,maxFileSize:elements.maxFileSize.value,
+  textLayers,activeLayerId,settingsVisible:!elements.settingsScroll.classList.contains('hidden-sidebar')
  };
- try{localStorage.setItem(SETTINGS_KEY,JSON.stringify(settings));}catch(error){console.warn('保存设置失败：',error);}
+ try{localStorage.setItem(SETTINGS_KEY,JSON.stringify(settings));}
+ catch(error){console.warn('保存设置失败：',error);}
 }
 function loadSettings() {
- try{
-  const raw=localStorage.getItem(SETTINGS_KEY);if(!raw)return;const s=JSON.parse(raw);
+ try {
+  const raw=localStorage.getItem(SETTINGS_KEY);
+  if(!raw){textLayers=[{...DEFAULT_TEXT_LAYER,id:createLayerId()}];activeLayerId=textLayers[0].id;return;}
+  const s=JSON.parse(raw);
   elements.format.value=s.format==='image/jpeg'?'image/jpeg':'image/png';
   elements.deleteOriginal.checked=s.deleteOriginal===true;elements.tags.value=s.tags||'';
-  elements.folderId.value=s.folderId||'';elements.textContent.value=s.textContent||'';
-  elements.textSize.value=String(clamp(Number(s.textSize)||28,12,72));elements.textSizeValue.textContent=elements.textSize.value;
-  elements.textColor.value=/^#[0-9a-f]{6}$/i.test(s.textColor||'')?s.textColor:'#ffffff';
-  elements.textStroke.checked=s.textStroke!==false;
-  elements.fontFamily.value=['Microsoft YaHei','Arial','serif','sans-serif'].includes(s.fontFamily)?s.fontFamily:'Microsoft YaHei';
-  elements.strokeWidth.value=String(clamp(Number(s.strokeWidth??3),0,12));elements.strokeWidthValue.textContent=elements.strokeWidth.value;
-  elements.textBackground.checked=s.textBackground===true;
-  elements.textBackgroundColor.value=/^#[0-9a-f]{6}$/i.test(s.textBackgroundColor||'')?s.textBackgroundColor:'#000000';
-  elements.jpegQuality.value=String(clamp(Number(s.jpegQuality)||90,40,100));elements.jpegQualityValue.textContent=elements.jpegQuality.value;
-  if(s.textPos&&Number.isFinite(s.textPos.x)&&Number.isFinite(s.textPos.y))
-   textPos={x:clamp(s.textPos.x,0,1),y:clamp(s.textPos.y,0,1)};
+  elements.folderId.value=s.folderId||'';
+  elements.jpegQuality.value=String(clamp(Number(s.jpegQuality)||90,40,100));
+  elements.jpegQualityValue.textContent=elements.jpegQuality.value;
+  elements.maxFileSize.value=String(clamp(Number(s.maxFileSize)||500,50,2048));
+  elements.maxFileSizeValue.textContent=elements.maxFileSize.value;
+  if(Array.isArray(s.textLayers)){
+   textLayers=s.textLayers.filter(layer=>layer&&typeof layer.text==='string').map(layer=>({...DEFAULT_TEXT_LAYER,...layer,id:layer.id||createLayerId()}));
+  } else if(typeof s.textContent==='string'&&s.textContent.trim()){
+   textLayers=[{...DEFAULT_TEXT_LAYER,id:createLayerId(),text:s.textContent,
+    size:clamp(Number(s.textSize)||28,12,96),color:s.textColor||'#ffffff',
+    fontFamily:s.fontFamily||'Microsoft YaHei',stroke:s.textStroke!==false,
+    strokeWidth:clamp(Number(s.strokeWidth??3),0,12),
+    background:s.textBackground===true,backgroundColor:s.textBackgroundColor||'#000000',
+    x:s.textPos?.x??0.5,y:s.textPos?.y??0.82}];
+  } else textLayers=[];
+  activeLayerId=textLayers.some(layer=>layer.id===s.activeLayerId)?s.activeLayerId:(textLayers[0]?.id||null);
   elements.settingsScroll.classList.toggle('hidden-sidebar',s.settingsVisible!==true);
- }catch(error){console.warn('读取设置失败，将使用默认设置：',error);}
+ } catch(error) {
+  console.warn('读取设置失败，将使用默认设置：',error);
+  textLayers=[{...DEFAULT_TEXT_LAYER,id:createLayerId()}];activeLayerId=textLayers[0].id;
+ }
 }
 function initDrag() {
- const overlay=elements.textOverlay,panel=document.querySelector('.image-panel');
- overlay.addEventListener('pointerdown',event=>{
-  if(!cropper)return;event.preventDefault();isDragging=true;dragPointerId=event.pointerId;
-  overlay.setPointerCapture(event.pointerId);const rect=overlay.getBoundingClientRect();
+ const host=elements.textOverlay,panel=document.querySelector('.image-panel');
+ host.addEventListener('pointerdown',event=>{
+  const node=event.target.closest('.text-layer-overlay');
+  if(!node||!cropper||isProcessing)return;
+  event.preventDefault();activeLayerId=node.dataset.layerId;dragLayerId=activeLayerId;
+  selectLayer(activeLayerId);node.setPointerCapture(event.pointerId);
+  const rect=node.getBoundingClientRect();
   dragOffset={x:event.clientX-(rect.left+rect.width/2),y:event.clientY-(rect.top+rect.height/2)};
-  overlay.style.cursor='grabbing';
+  node.classList.add('dragging');
  });
- overlay.addEventListener('pointermove',event=>{
-  if(!isDragging||event.pointerId!==dragPointerId||!cropper)return;
-  const panelRect=panel.getBoundingClientRect(),box=getCropBoxInPanel(panel);
+ host.addEventListener('pointermove',event=>{
+  if(!dragLayerId||!cropper)return;
+  const layer=textLayers.find(item=>item.id===dragLayerId);if(!layer)return;
+  const box=getCropBoxInPanel(panel),panelRect=panel.getBoundingClientRect();
   const cx=event.clientX-panelRect.left-dragOffset.x,cy=event.clientY-panelRect.top-dragOffset.y;
-  textPos={x:clamp((cx-box.left)/box.width,0,1),y:clamp((cy-box.top)/box.height,0,1)};
+  layer.x=clamp((cx-box.left)/box.width,0,1);layer.y=clamp((cy-box.top)/box.height,0,1);
   positionOverlay();updatePreview();
  });
- const stop=event=>{
-  if(!isDragging||(event&&event.pointerId!==dragPointerId))return;
-  isDragging=false;dragPointerId=null;overlay.style.cursor='move';saveSettings();
- };
- overlay.addEventListener('pointerup',stop);overlay.addEventListener('pointercancel',stop);
- overlay.addEventListener('lostpointercapture',stop);
+ const stop=()=>{if(!dragLayerId)return;dragLayerId=null;saveSettings();};
+ host.addEventListener('pointerup',stop);host.addEventListener('pointercancel',stop);
+ host.addEventListener('lostpointercapture',stop);
 }
 function getCropBoxInPanel(panel) {
  const box=cropper.getCropBoxData();
