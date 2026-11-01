@@ -1,467 +1,260 @@
 const fs = require('fs');
 const path = require('path');
 const os = require('os');
-
-let cropper = null;
-let selectedItems = [];
-let currentIndex = 0;
-let textPos = { x: 0.5, y: 0.5 };
-let isDragging = false;
-let dragOffset = { x: 0, y: 0 };
-
+const { pathToFileURL } = require('url');
+const SETTINGS_KEY = 'wechat_sticker_settings';
+const OUTPUT_SIZE = 300;
+let cropper = null, selectedItems = [], currentIndex = 0;
+let textPos = { x: 0.5, y: 0.82 }, isDragging = false, dragPointerId = null;
+let dragOffset = { x: 0, y: 0 }, previewTimer = null, loadToken = 0, isProcessing = false;
+const completedIndexes = new Set();
+const $ = (id) => document.getElementById(id);
 const elements = {
-    image: document.getElementById('image-to-crop'),
-    currentIndex: document.getElementById('current-index'),
-    totalCount: document.getElementById('total-count'),
-    format: document.getElementById('export-format'),
-    deleteOriginal: document.getElementById('delete-original'),
-    tags: document.getElementById('tags'),
-    folderId: document.getElementById('folder-id'),
-    prevBtn: document.getElementById('prev-btn'),
-    nextBtn: document.getElementById('next-btn'),
-    skipBtn: document.getElementById('skip-btn'),
-    loadingOverlay: document.getElementById('loading-overlay'),
-    settingsScroll: document.getElementById('settings-scroll'),
-    settingsToggle: document.getElementById('settings-toggle'),
-    rotateLeft: document.getElementById('rotate-left'),
-    rotateRight: document.getElementById('rotate-right'),
-    flipH: document.getElementById('flip-h'),
-    previewImg: document.getElementById('preview-img'),
-    textContent: document.getElementById('text-content'),
-    textSize: document.getElementById('text-size'),
-    textSizeValue: document.getElementById('text-size-value'),
-    textColor: document.getElementById('text-color'),
-    textStroke: document.getElementById('text-stroke'),
-    textOverlay: document.getElementById('text-overlay'),
-    thumbList: document.getElementById('thumb-list')
+ image:$('image-to-crop'), currentIndex:$('current-index'), totalCount:$('total-count'),
+ format:$('export-format'), deleteOriginal:$('delete-original'), tags:$('tags'), folderId:$('folder-id'),
+ prevBtn:$('prev-btn'), nextBtn:$('next-btn'), skipBtn:$('skip-btn'), loadingOverlay:$('loading-overlay'),
+ settingsScroll:$('settings-scroll'), settingsToggle:$('settings-toggle'), rotateLeft:$('rotate-left'),
+ rotateRight:$('rotate-right'), flipH:$('flip-h'), previewImg:$('preview-img'), textContent:$('text-content'),
+ textSize:$('text-size'), textSizeValue:$('text-size-value'), textColor:$('text-color'),
+ textStroke:$('text-stroke'), textOverlay:$('text-overlay'), thumbList:$('thumb-list')
 };
 
-// 插件初始化
-eagle.onPluginCreate(async (plugin) => {
-    console.log('微信表情包大师插件已启动');
-
-    const hasExistingSettings = loadSettings();
-
-    if (hasExistingSettings) {
-        elements.settingsScroll.classList.add('hidden-sidebar');
-    }
-
-    elements.settingsToggle.addEventListener('click', () => {
-        elements.settingsScroll.classList.toggle('hidden-sidebar');
-    });
-
-    // 字号滑块实时显示数值 + 同步浮层样式
-    elements.textSize.addEventListener('input', () => {
-        elements.textSizeValue.textContent = elements.textSize.value;
-        syncOverlayStyle();
-    });
-
-    // 颜色/描边变更时同步浮层样式
-    elements.textColor.addEventListener('input', syncOverlayStyle);
-    elements.textStroke.addEventListener('change', syncOverlayStyle);
-
-    // 文字内容变更时更新浮层文字
-    elements.textContent.addEventListener('input', () => {
-        updateOverlayContent();
-    });
-
-    // 初始化拖拽
-    initDrag();
-
-    // 获取选中的项目
-    selectedItems = await eagle.item.getSelected();
-
-    if (selectedItems.length === 0) {
-        alert('请先在 Eagle 中选择至少一张图片。');
-        closeAndFocus();
-        return;
-    }
-
-    elements.totalCount.textContent = selectedItems.length;
-    renderThumbList();
-    showItem(0);
+eagle.onPluginCreate(async () => {
+ try {
+  loadSettings(); bindControls(); initDrag();
+  selectedItems = await eagle.item.getSelected();
+  if (!Array.isArray(selectedItems) || !selectedItems.length) {
+   alert('请先在 Eagle 中选择至少一张图片。'); await closeAndFocus(); return;
+  }
+  elements.totalCount.textContent = String(selectedItems.length);
+  renderThumbList(); await showItem(0);
+ } catch (error) {
+  console.error('插件初始化失败：', error);
+  alert('插件初始化失败：' + getErrorMessage(error));
+ }
 });
 
-// 显示指定索引的图片
-function showItem(index) {
-    if (index < 0 || index >= selectedItems.length) return;
-
-    currentIndex = index;
-    const item = selectedItems[currentIndex];
-
-    elements.currentIndex.textContent = currentIndex + 1;
-    elements.prevBtn.disabled = currentIndex === 0;
-    elements.nextBtn.textContent = currentIndex === selectedItems.length - 1 ? '保存并完成' : '保存并下一个';
-
-    updateThumbActive();
-
-    if (cropper) {
-        cropper.destroy();
-    }
-
-    const filePath = item.filePath.replace(/\\/g, '/');
-    elements.image.src = `file:///${filePath.startsWith('/') ? '' : '/'}${filePath}`;
-
-    elements.image.onload = () => {
-        cropper = new Cropper(elements.image, {
-            aspectRatio: 1 / 1,
-            viewMode: 1,
-            autoCropArea: 1,
-            responsive: true,
-            ready() {
-                bindImageTools();
-                syncOverlayStyle();
-                updateOverlayContent();
-                positionOverlay();
-                updatePreview();
-            },
-            crop() {
-                positionOverlay();
-                updatePreview();
-            }
-        });
-    };
+function bindControls() {
+ elements.settingsToggle.addEventListener('click', () => elements.settingsScroll.classList.toggle('hidden-sidebar'));
+ elements.textSize.addEventListener('input', () => {
+  elements.textSizeValue.textContent = elements.textSize.value;
+  syncOverlayStyle(); updatePreview(); saveSettings();
+ });
+ [elements.textColor,elements.textStroke].forEach(el => {
+  el.addEventListener('input', () => { syncOverlayStyle(); updatePreview(); saveSettings(); });
+  el.addEventListener('change', saveSettings);
+ });
+ elements.textContent.addEventListener('input', () => {
+  updateOverlayContent(); positionOverlay(); updatePreview(); saveSettings();
+ });
+ [elements.format,elements.deleteOriginal,elements.tags,elements.folderId].forEach(el => {
+  el.addEventListener('change', saveSettings); el.addEventListener('input', saveSettings);
+ });
+ elements.nextBtn.addEventListener('click', handleSaveAndNext);
+ elements.prevBtn.addEventListener('click', () => showItem(currentIndex-1));
+ elements.skipBtn.addEventListener('click', handleSkip);
+ elements.rotateLeft.addEventListener('click', () => cropper && cropper.rotate(-90));
+ elements.rotateRight.addEventListener('click', () => cropper && cropper.rotate(90));
+ elements.flipH.addEventListener('click', () => {
+  if (!cropper) return; const data=cropper.getData(); cropper.scaleX(data.scaleX===-1?1:-1);
+ });
 }
 
-// ===== 缩略图列表 =====
-
+async function showItem(index) {
+ if (isProcessing || index<0 || index>=selectedItems.length) return;
+ currentIndex=index; const token=++loadToken; destroyCropper();
+ elements.currentIndex.textContent=String(index+1);
+ elements.prevBtn.disabled=index===0;
+ elements.nextBtn.textContent=index===selectedItems.length-1?'保存并完成':'保存并下一个';
+ updateThumbState();
+ const item=selectedItems[index];
+ if (!item || !item.filePath) throw new Error('无法读取当前图片的文件路径。');
+ elements.image.onload=null; elements.image.onerror=null;
+ elements.image.src=pathToFileURL(path.resolve(item.filePath)).href;
+ try {
+  await waitForImage(elements.image); if (token!==loadToken) return;
+  cropper=new Cropper(elements.image,{
+   aspectRatio:1,viewMode:1,autoCropArea:1,responsive:true,background:false,
+   ready(){if(token!==loadToken)return;syncOverlayStyle();updateOverlayContent();positionOverlay();updatePreview();},
+   crop(){if(token!==loadToken)return;positionOverlay();updatePreview();}
+  });
+ } catch(error) {
+  if(token!==loadToken)return; console.error('图片加载失败：',error);
+  alert('图片加载失败：'+getErrorMessage(error));
+ }
+}
+function waitForImage(img) {
+ return new Promise((resolve,reject)=>{
+  if(img.complete&&img.naturalWidth>0)return resolve();
+  img.onload=()=>resolve(); img.onerror=()=>reject(new Error('无法打开图片文件，请检查文件是否存在或可访问。'));
+ });
+}
+function destroyCropper() {
+ clearTimeout(previewTimer); if(cropper){cropper.destroy();cropper=null;}
+ elements.previewImg.removeAttribute('src');
+}
 function renderThumbList() {
-    const list = elements.thumbList;
-    list.innerHTML = '';
-
-    selectedItems.forEach((item, i) => {
-        const div = document.createElement('div');
-        div.className = 'thumb-item';
-        div.dataset.index = i;
-
-        const filePath = item.filePath.replace(/\\/g, '/');
-        div.innerHTML = `
-            <img src="file:///${filePath.startsWith('/') ? '' : '/'}${filePath}" alt="">
-            <span class="thumb-index">${i + 1}</span>
-        `;
-
-        div.addEventListener('click', () => showItem(i));
-        list.appendChild(div);
-    });
+ elements.thumbList.replaceChildren();
+ selectedItems.forEach((item,index)=>{
+  const button=document.createElement('button'); button.type='button'; button.className='thumb-item';
+  button.title=item.name||('图片 '+(index+1));
+  const image=document.createElement('img'); image.alt=''; image.loading='lazy';
+  image.src=pathToFileURL(path.resolve(item.filePath)).href;
+  const label=document.createElement('span'); label.className='thumb-index'; label.textContent=String(index+1);
+  button.append(image,label); button.addEventListener('click',()=>showItem(index)); elements.thumbList.appendChild(button);
+ });
+ updateThumbState();
 }
-
-function updateThumbActive() {
-    const items = elements.thumbList.querySelectorAll('.thumb-item');
-    items.forEach((el, i) => {
-        el.classList.toggle('active', i === currentIndex);
-    });
+function updateThumbState() {
+ elements.thumbList.querySelectorAll('.thumb-item').forEach((item,index)=>{
+  item.classList.toggle('active',index===currentIndex);
+  item.classList.toggle('done',completedIndexes.has(index));
+  item.setAttribute('aria-current',index===currentIndex?'true':'false');
+ });
 }
-
-function markThumbDone(index) {
-    const items = elements.thumbList.querySelectorAll('.thumb-item');
-    if (items[index]) {
-        items[index].classList.add('done');
-    }
+async function handleSaveAndNext() {
+ if(isProcessing||!cropper)return; setProcessing(true);
+ try {
+  await processAndSave(); completedIndexes.add(currentIndex); updateThumbState();
+  if(currentIndex<selectedItems.length-1){setProcessing(false);await showItem(currentIndex+1);}
+  else {alert('全部处理完成！成功处理 '+completedIndexes.size+' 张图片。');await closeAndFocus();}
+ } catch(error) {
+  console.error('保存失败：',error); alert('保存失败，原图未删除。\n'+getErrorMessage(error));
+ } finally {setProcessing(false);}
 }
-
-// "下一步"按钮点击处理
-elements.nextBtn.onclick = async () => {
-    showLoading(true);
-    try {
-        await processAndSave();
-
-        if (currentIndex < selectedItems.length - 1) {
-            showItem(currentIndex + 1);
-        } else {
-            alert('所有表情包处理完成！');
-            await closeAndFocus();
-        }
-    } catch (err) {
-        console.error(err);
-        alert('处理图片时出错: ' + err.message);
-    } finally {
-        showLoading(false);
-    }
-};
-
-// "上一步"按钮点击处理
-elements.prevBtn.onclick = () => {
-    showItem(currentIndex - 1);
-};
-
-// "跳过"按钮点击处理
-elements.skipBtn.onclick = () => {
-    if (currentIndex < selectedItems.length - 1) {
-        showItem(currentIndex + 1);
-    } else {
-        closeAndFocus();
-    }
-};
-
-// 处理并保存当前图片
+async function handleSkip() {
+ if(isProcessing)return;
+ if(currentIndex<selectedItems.length-1)await showItem(currentIndex+1); else await closeAndFocus();
+}
 async function processAndSave() {
-    if (!cropper) return;
-
-    const canvas = cropper.getCroppedCanvas({
-        width: 300,
-        height: 300,
-        imageSmoothingEnabled: true,
-        imageSmoothingQuality: 'high',
-    });
-
-    drawTextOnCanvas(canvas);
-
-    const format = elements.format.value;
-    const extension = format === 'image/png' ? 'png' : 'jpg';
-    const quality = format === 'image/jpeg' ? 0.8 : undefined;
-
-    const dataUrl = canvas.toDataURL(format, quality);
-    const base64Data = dataUrl.replace(/^data:image\/\w+;base64,/, "");
-    const buffer = Buffer.from(base64Data, 'base64');
-
-    const tempFileName = `sticker_${Date.now()}.${extension}`;
-    const tempFilePath = path.join(os.tmpdir(), tempFileName);
-    fs.writeFileSync(tempFilePath, buffer);
-
-    const tagsInput = elements.tags.value.split(',').map(t => t.trim()).filter(t => t);
-    const folderId = elements.folderId.value.trim();
-    const originalItem = selectedItems[currentIndex];
-
-    const options = {
-        name: originalItem.name + "_表情包",
-        tags: tagsInput,
-    };
-
-    if (folderId) {
-        options.folderId = folderId;
-    }
-
-    await eagle.item.addFromPath(tempFilePath, options);
-
-    try { fs.unlinkSync(tempFilePath); } catch {}
-
-    if (elements.deleteOriginal.checked) {
-        await eagle.item.moveToTrash([originalItem.id]);
-    }
-
-    saveSettings();
-    markThumbDone(currentIndex);
+ if(!cropper)throw new Error('图片尚未准备好，请稍后重试。');
+ const canvas=cropper.getCroppedCanvas({width:OUTPUT_SIZE,height:OUTPUT_SIZE,imageSmoothingEnabled:true,imageSmoothingQuality:'high'});
+ if(!canvas)throw new Error('无法生成裁剪结果。');
+ drawTextOnCanvas(canvas);
+ const format=elements.format.value==='image/jpeg'?'image/jpeg':'image/png';
+ const extension=format==='image/jpeg'?'jpg':'png';
+ const buffer=await canvasToBuffer(canvas,format,format==='image/jpeg'?0.9:undefined);
+ const tempFilePath=path.join(os.tmpdir(),'eagle-sticker-'+Date.now()+'-'+Math.random().toString(36).slice(2)+'.'+extension);
+ const originalItem=selectedItems[currentIndex];
+ try {
+  await fs.promises.writeFile(tempFilePath,buffer);
+  const options={name:(originalItem.name||'图片')+'_表情包',tags:elements.tags.value.split(/[,，]/).map(t=>t.trim()).filter(Boolean)};
+  const folderId=elements.folderId.value.trim(); if(folderId)options.folderId=folderId;
+  await eagle.item.addFromPath(tempFilePath,options);
+  // addFromPath 成功完成后才允许将原图移入回收站。
+  if(elements.deleteOriginal.checked)await eagle.item.moveToTrash([originalItem.id]);
+  saveSettings();
+ } finally {
+  try{await fs.promises.unlink(tempFilePath);}catch(error){console.warn('临时文件清理失败：',error);}
+ }
 }
-
-// 绑定旋转/翻转按钮事件
-function bindImageTools() {
-    elements.rotateLeft.onclick = () => cropper.rotate(-90);
-    elements.rotateRight.onclick = () => cropper.rotate(90);
-    elements.flipH.onclick = () => {
-        const data = cropper.getData();
-        cropper.scaleX(data.scaleX === -1 ? 1 : -1);
-    };
+function canvasToBuffer(canvas,format,quality) {
+ return new Promise((resolve,reject)=>{
+  canvas.toBlob(blob=>{
+   if(!blob)return reject(new Error('图片编码失败，请尝试更换导出格式。'));
+   blob.arrayBuffer().then(data=>resolve(Buffer.from(data))).catch(reject);
+  },format,quality);
+ });
 }
-
-// 在 Canvas 上绘制文字
 function drawTextOnCanvas(canvas) {
-    const text = elements.textContent.value.trim();
-    if (!text) return;
-
-    const ctx = canvas.getContext('2d');
-    const fontSize = parseInt(elements.textSize.value, 10);
-    const color = elements.textColor.value;
-    const stroke = elements.textStroke.checked;
-
-    ctx.font = `bold ${fontSize}px "Microsoft YaHei", "PingFang SC", sans-serif`;
-    ctx.textAlign = 'center';
-    ctx.textBaseline = 'middle';
-
-    const x = textPos.x * canvas.width;
-    const y = textPos.y * canvas.height;
-
-    if (stroke) {
-        ctx.lineWidth = 4;
-        ctx.strokeStyle = '#000';
-        ctx.strokeText(text, x, y);
-    }
-
-    ctx.fillStyle = color;
-    ctx.fillText(text, x, y);
+ const text=elements.textContent.value.trim(); if(!text)return;
+ const ctx=canvas.getContext('2d'),fontSize=Number(elements.textSize.value)||28;
+ ctx.save();ctx.font='bold '+fontSize+'px "Microsoft YaHei", "PingFang SC", sans-serif';
+ ctx.textAlign='center';ctx.textBaseline='middle';ctx.lineJoin='round';
+ const x=clamp(textPos.x,0,1)*canvas.width,y=clamp(textPos.y,0,1)*canvas.height;
+ const lines=text.split(/\r?\n/),lineHeight=fontSize*1.2,startY=y-((lines.length-1)*lineHeight)/2;
+ lines.forEach((line,index)=>{
+  const lineY=startY+index*lineHeight;
+  if(elements.textStroke.checked){ctx.lineWidth=Math.max(2,fontSize*0.12);ctx.strokeStyle='#000';ctx.strokeText(line,x,lineY);}
+  ctx.fillStyle=elements.textColor.value;ctx.fillText(line,x,lineY);
+ });
+ ctx.restore();
 }
-
-// 更新输出预览（防抖）
-let previewTimer = null;
 function updatePreview() {
-    if (!cropper) return;
-    clearTimeout(previewTimer);
-    previewTimer = setTimeout(() => {
-        const canvas = cropper.getCroppedCanvas({
-            width: 300,
-            height: 300,
-            imageSmoothingEnabled: true,
-            imageSmoothingQuality: 'high',
-        });
-        drawTextOnCanvas(canvas);
-        elements.previewImg.src = canvas.toDataURL('image/png');
-    }, 80);
+ if(!cropper)return;clearTimeout(previewTimer);
+ previewTimer=setTimeout(()=>{
+  if(!cropper)return;
+  try{
+   const canvas=cropper.getCroppedCanvas({width:OUTPUT_SIZE,height:OUTPUT_SIZE,imageSmoothingEnabled:true,imageSmoothingQuality:'high'});
+   if(!canvas)return;drawTextOnCanvas(canvas);elements.previewImg.src=canvas.toDataURL('image/png');
+  }catch(error){console.warn('预览更新失败：',error);}
+ },80);
 }
-
-// 显示/隐藏加载遮罩
-function showLoading(show) {
-    if (show) {
-        elements.loadingOverlay.classList.remove('hidden');
-    } else {
-        elements.loadingOverlay.classList.add('hidden');
-    }
+function setProcessing(processing) {
+ isProcessing=processing;elements.loadingOverlay.classList.toggle('hidden',!processing);
+ elements.nextBtn.disabled=processing;elements.prevBtn.disabled=processing||currentIndex===0;
+ elements.skipBtn.disabled=processing;elements.settingsToggle.disabled=processing;
+ elements.thumbList.querySelectorAll('button').forEach(button=>button.disabled=processing);
 }
-
-// 保存用户偏好设置到本地存储
 function saveSettings() {
-    const settings = {
-        format: elements.format.value,
-        deleteOriginal: elements.deleteOriginal.checked,
-        tags: elements.tags.value,
-        folderId: elements.folderId.value,
-        textContent: elements.textContent.value,
-        textSize: elements.textSize.value,
-        textColor: elements.textColor.value,
-        textStroke: elements.textStroke.checked,
-        textPos: { x: textPos.x, y: textPos.y }
-    };
-    localStorage.setItem('wechat_sticker_settings', JSON.stringify(settings));
+ const settings={
+  format:elements.format.value,deleteOriginal:elements.deleteOriginal.checked,tags:elements.tags.value,
+  folderId:elements.folderId.value,textContent:elements.textContent.value,textSize:elements.textSize.value,
+  textColor:elements.textColor.value,textStroke:elements.textStroke.checked,
+  textPos:{x:textPos.x,y:textPos.y},settingsVisible:!elements.settingsScroll.classList.contains('hidden-sidebar')
+ };
+ try{localStorage.setItem(SETTINGS_KEY,JSON.stringify(settings));}catch(error){console.warn('保存设置失败：',error);}
 }
-
-// 从本地存储加载设置，返回是否有已保存的设置
 function loadSettings() {
-    const saved = localStorage.getItem('wechat_sticker_settings');
-    if (!saved) return false;
-
-    try {
-        const settings = JSON.parse(saved);
-        elements.format.value = settings.format || 'image/png';
-        elements.deleteOriginal.checked = settings.deleteOriginal || false;
-        elements.tags.value = settings.tags || '';
-        elements.folderId.value = settings.folderId || '';
-        elements.textContent.value = settings.textContent || '';
-        elements.textSize.value = settings.textSize || 28;
-        elements.textSizeValue.textContent = elements.textSize.value;
-        elements.textColor.value = settings.textColor || '#ffffff';
-        elements.textStroke.checked = settings.textStroke !== undefined ? settings.textStroke : true;
-        if (settings.textPos) {
-            textPos.x = settings.textPos.x;
-            textPos.y = settings.textPos.y;
-        }
-        return true;
-    } catch {
-        return false;
-    }
+ try{
+  const raw=localStorage.getItem(SETTINGS_KEY);if(!raw)return;const s=JSON.parse(raw);
+  elements.format.value=s.format==='image/jpeg'?'image/jpeg':'image/png';
+  elements.deleteOriginal.checked=s.deleteOriginal===true;elements.tags.value=s.tags||'';
+  elements.folderId.value=s.folderId||'';elements.textContent.value=s.textContent||'';
+  elements.textSize.value=String(clamp(Number(s.textSize)||28,12,72));elements.textSizeValue.textContent=elements.textSize.value;
+  elements.textColor.value=/^#[0-9a-f]{6}$/i.test(s.textColor||'')?s.textColor:'#ffffff';
+  elements.textStroke.checked=s.textStroke!==false;
+  if(s.textPos&&Number.isFinite(s.textPos.x)&&Number.isFinite(s.textPos.y))
+   textPos={x:clamp(s.textPos.x,0,1),y:clamp(s.textPos.y,0,1)};
+  elements.settingsScroll.classList.toggle('hidden-sidebar',s.settingsVisible!==true);
+ }catch(error){console.warn('读取设置失败，将使用默认设置：',error);}
 }
-
-// ===== 可拖拽文字浮层 =====
-
 function initDrag() {
-    const overlay = elements.textOverlay;
-    const panel = document.querySelector('.image-panel');
-
-    overlay.addEventListener('mousedown', (e) => {
-        e.preventDefault();
-        isDragging = true;
-        const rect = overlay.getBoundingClientRect();
-        dragOffset.x = e.clientX - rect.left - rect.width / 2;
-        dragOffset.y = e.clientY - rect.top - rect.height / 2;
-        overlay.style.cursor = 'grabbing';
-    });
-
-    document.addEventListener('mousemove', (e) => {
-        if (!isDragging) return;
-        const panelRect = panel.getBoundingClientRect();
-        let x = e.clientX - panelRect.left;
-        let y = e.clientY - panelRect.top;
-
-        // 约束在面板范围内
-        x = Math.max(0, Math.min(panelRect.width, x));
-        y = Math.max(0, Math.min(panelRect.height, y));
-
-        // 转换为相对坐标 0~1
-        textPos.x = x / panelRect.width;
-        textPos.y = y / panelRect.height;
-
-        overlay.style.left = x + 'px';
-        overlay.style.top = y + 'px';
-    });
-
-    document.addEventListener('mouseup', () => {
-        if (isDragging) {
-            isDragging = false;
-            elements.textOverlay.style.cursor = 'move';
-        }
-    });
+ const overlay=elements.textOverlay,panel=document.querySelector('.image-panel');
+ overlay.addEventListener('pointerdown',event=>{
+  if(!cropper)return;event.preventDefault();isDragging=true;dragPointerId=event.pointerId;
+  overlay.setPointerCapture(event.pointerId);const rect=overlay.getBoundingClientRect();
+  dragOffset={x:event.clientX-(rect.left+rect.width/2),y:event.clientY-(rect.top+rect.height/2)};
+  overlay.style.cursor='grabbing';
+ });
+ overlay.addEventListener('pointermove',event=>{
+  if(!isDragging||event.pointerId!==dragPointerId||!cropper)return;
+  const panelRect=panel.getBoundingClientRect(),box=cropper.getCropBoxData();
+  const cx=event.clientX-panelRect.left-dragOffset.x,cy=event.clientY-panelRect.top-dragOffset.y;
+  textPos={x:clamp((cx-box.left)/box.width,0,1),y:clamp((cy-box.top)/box.height,0,1)};
+  positionOverlay();updatePreview();
+ });
+ const stop=event=>{
+  if(!isDragging||(event&&event.pointerId!==dragPointerId))return;
+  isDragging=false;dragPointerId=null;overlay.style.cursor='move';saveSettings();
+ };
+ overlay.addEventListener('pointerup',stop);overlay.addEventListener('pointercancel',stop);
+ overlay.addEventListener('lostpointercapture',stop);
 }
-
-// 根据 textPos 和裁剪区域定位浮层
 function positionOverlay() {
-    const overlay = elements.textOverlay;
-    const text = elements.textContent.value.trim();
-
-    if (!text || !cropper) {
-        overlay.classList.add('hidden');
-        return;
-    }
-
-    overlay.classList.remove('hidden');
-
-    const panel = document.querySelector('.image-panel');
-    const panelRect = panel.getBoundingClientRect();
-    const cropBox = cropper.getCropBoxData();
-
-    // 裁剪框相对于面板的位置
-    const cropLeft = cropBox.left;
-    const cropTop = cropBox.top;
-    const cropWidth = cropBox.width;
-    const cropHeight = cropBox.height;
-
-    // 浮层位置 = 裁剪框左上角 + 相对坐标 * 裁剪框尺寸
-    const x = cropLeft + textPos.x * cropWidth;
-    const y = cropTop + textPos.y * cropHeight;
-
-    overlay.style.left = x + 'px';
-    overlay.style.top = y + 'px';
+ const overlay=elements.textOverlay;
+ if(!elements.textContent.value.trim()||!cropper){overlay.classList.add('hidden');return;}
+ const box=cropper.getCropBoxData();overlay.classList.remove('hidden');
+ overlay.style.left=(box.left+textPos.x*box.width)+'px';
+ overlay.style.top=(box.top+textPos.y*box.height)+'px';
+ overlay.style.fontSize=(Number(elements.textSize.value)*box.width/OUTPUT_SIZE)+'px';
 }
-
-// 同步浮层样式（字号、颜色、描边）
 function syncOverlayStyle() {
-    const overlay = elements.textOverlay;
-    const fontSize = elements.textSize.value;
-    const color = elements.textColor.value;
-    const stroke = elements.textStroke.checked;
-
-    overlay.style.fontSize = fontSize + 'px';
-    overlay.style.color = color;
-
-    if (stroke) {
-        overlay.style.textShadow = '2px 2px 4px rgba(0,0,0,0.8)';
-    } else {
-        overlay.style.textShadow = 'none';
-    }
+ elements.textOverlay.style.color=elements.textColor.value;
+ elements.textOverlay.style.textShadow=elements.textStroke.checked?'0 0 2px #000, 1px 1px 2px #000, -1px -1px 2px #000':'none';
+ positionOverlay();
 }
-
-// 更新浮层文字内容
 function updateOverlayContent() {
-    const overlay = elements.textOverlay;
-    const text = elements.textContent.value.trim();
-
-    if (text) {
-        overlay.textContent = text;
-        overlay.classList.remove('hidden');
-    } else {
-        overlay.classList.add('hidden');
-    }
+ const text=elements.textContent.value.trim();elements.textOverlay.textContent=text;
+ elements.textOverlay.classList.toggle('hidden',!text);
 }
-
-// ===== 窗口关闭聚焦 =====
-
+function clamp(value,min,max){return Math.min(max,Math.max(min,value));}
+function getErrorMessage(error){return error&&error.message?error.message:String(error||'未知错误');}
 async function closeAndFocus() {
-    try {
-        if (eagle.mainWindow && eagle.mainWindow.focus) {
-            eagle.mainWindow.focus();
-        }
-        const folderId = elements.folderId.value.trim();
-        if (folderId && eagle.folder && eagle.folder.open) {
-            await eagle.folder.open(folderId);
-        }
-    } catch (e) {
-        console.warn('聚焦 Eagle 失败:', e);
-    }
-    window.close();
+ try{
+  if(eagle.mainWindow&&typeof eagle.mainWindow.focus==='function')eagle.mainWindow.focus();
+  const folderId=elements.folderId.value.trim();
+  if(folderId&&eagle.folder&&typeof eagle.folder.open==='function')await eagle.folder.open(folderId);
+ }catch(error){console.warn('聚焦 Eagle 或打开文件夹失败：',error);}
+ window.close();
 }
