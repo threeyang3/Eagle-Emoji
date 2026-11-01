@@ -1,60 +1,52 @@
 # CLAUDE.md
 
-This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+## 项目定位
 
-## Project Overview
+微信表情包大师是直接运行于 Eagle 插件环境的桌面插件，使用原生 HTML/CSS/JavaScript、Eagle Plugin API、Node.js 文件能力及 Cropper.js，不引入构建系统。
 
-微信表情包大师 (WeChat Sticker Pro) — an Eagle plugin that batch-processes images into WeChat-compliant stickers (300x300px, 1:1 crop). No build system; plain HTML/CSS/JS loaded directly by Eagle.
+## 文件职责
 
-## Architecture
+- manifest.json：插件 ID、版本、窗口配置。
+- index.html：界面结构及 Cropper.js 依赖加载。
+- script.js：初始化、队列、裁剪器生命周期、Canvas 导出、Eagle 导入、设置持久化。
+- style.css：界面样式。
+- README.md：用户安装、使用和安全说明。
 
-- `manifest.json` — Eagle plugin config (entry point, window size, plugin ID)
-- `index.html` — UI shell; loads Cropper.js from cdnjs CDN
-- `script.js` — all logic: Eagle API integration, Cropper.js lifecycle, Canvas-based image processing, batch queue, localStorage settings persistence
-- `style.css` — Eagle native style (light grays, blue accent `#4a90d9`)
-- `logo.png` — plugin icon (referenced by `manifest.json`)
+## 核心流程
 
-The flow: Eagle launches plugin → `eagle.onPluginCreate` grabs selected items → renders thumbnail list on the left → user crops each image with Cropper.js (locked 1:1) → draggable text overlay for positioning → `getCroppedCanvas` renders to 300x300 → text drawn via Canvas → buffer written to temp file → `eagle.item.addFromPath` imports back into Eagle → `closeAndFocus()` focuses Eagle main window and opens target folder.
+Eagle 启动插件 → 获取选中素材 → 建立队列 → 逐项加载图片 → 1:1 裁剪 → Canvas 绘制文字 → 写入临时文件 → eagle.item.addFromPath 导入 Eagle → 可选将原图移入回收站。
 
-## Key Technical Details
+## 不可破坏的行为约束
 
-- **Eagle Plugin API**: `eagle.onPluginCreate` for init, `eagle.item.getSelected()` for batch input, `eagle.item.addFromPath()` for save, `eagle.item.moveToTrash()` for optional delete, `eagle.mainWindow.focus()` + `eagle.folder.open()` for post-save focus
-- **Image loading**: uses `file://` protocol on `item.filePath` — requires Eagle permission
-- **Cropper.js**: locked `aspectRatio: 1/1`, `viewMode: 1`, `autoCropArea: 1`. Also uses `rotate()`, `scaleX()` for flip, and `crop` event for live preview
-- **Output**: always 300x300px; JPG at quality 0.8 or PNG lossless
-- **Settings persistence**: `localStorage` key `wechat_sticker_settings` (format, tags, folder ID, delete-original, text content/size/color/position/stroke)
-- **Text overlay**: draggable `<div>` positioned via `textPos` relative coordinates (0–1); synced to crop box via `positionOverlay()`. Rendered via Canvas `fillText`/`strokeText` on export. Font: bold Microsoft YaHei/PingFang SC. Style (size, color, stroke) synced in real-time from controls.
-- **Thumbnail list**: 80px left sidebar showing all selected items. Click to navigate. Completed items get a checkmark (`.done` class).
-- **Settings panel**: export settings section hides after first use (checks localStorage); toggle button (⚙) in header to show/hide. Text settings + preview in `.controls-fixed` are always visible. Action buttons always visible at bottom.
+1. 导出尺寸固定为 **300 × 300 px**，裁剪比例固定为 **1:1**。
+2. **绝不能在新文件导入之前删除或移动原图。** 删除原图默认关闭；只有 addFromPath 成功完成后才允许调用 moveToTrash。
+3. 临时文件必须在 finally 中清理；清理失败只记录警告，不覆盖原始导入错误。
+4. 队列处理期间必须防止重复提交、跳转和并发修改。
+5. 图片路径必须正确处理空格及特殊字符；使用 pathToFileURL，不要手工拼接 file://。
+6. 文字位置使用裁剪区域内 0–1 的归一化坐标；预览和最终 Canvas 必须共享同一组坐标及字号语义。
+7. 用户设置读取失败时使用安全默认值，不得阻止插件启动。
+8. 不得将用户素材上传至外部服务。
 
-## Constraints
+## 开发要求
 
-- UI text, comments, and docs must be in **中文**
-- Image output is hardcoded to **300x300px** — do not change
-- Crop aspect ratio is hardcoded to **1:1** — do not change
-- External dependency (Cropper.js 1.5.13) loaded via CDN — no package manager
-- No build, lint, or test commands exist; changes are live-reloaded by Eagle
+- 面向用户的 UI、注释和文档使用中文。
+- 优先修复真实问题，不要堆叠无意义的防御性检查或抽象层。
+- 修改 Eagle API 调用前，核对 Eagle Plugin API 的实际返回语义。
+- 不要静默吞掉图片导入失败；错误信息应能指导用户排查。
+- 不要改变插件 ID，避免已安装用户被识别为另一个插件。
+- 更新功能时同步更新 README 和 manifest 版本。
 
-## Release Workflow
+## 验证清单
 
-发布新版本的完整流程：
+- PNG/JPG 是否均能生成 300 × 300 图片。
+- 旋转、翻转、裁剪后预览与导出是否一致。
+- 文字位置、字号、颜色、描边是否一致；空文字是否不绘制。
+- 多图队列是否能保存、跳过、返回及跳转。
+- 保存失败是否保留原图且允许重试。
+- 开启删除原图时，是否严格在导入成功后执行。
+- 临时文件是否在成功和失败路径都清理。
+- Eagle 重启后设置是否能恢复。
 
-1. **提交代码** — 确保所有改动已 commit 并 push 到 GitHub
-   ```bash
-   git add -A
-   git commit -m "vX.Y.Z: 版本说明"
-   git push
-   ```
+## 发布
 
-2. **打包插件文件** — 将以下 5 个必需文件打成 zip：
-   - `manifest.json`、`index.html`、`logo.png`、`script.js`、`style.css`
-   ```bash
-   zip -j wechat-sticker-pro-vX.Y.Z.zip manifest.json index.html logo.png script.js style.css
-   ```
-
-3. **创建 Release** — 使用 `gh release create` 发布并上传附件
-   ```bash
-   gh release create vX.Y.Z wechat-sticker-pro-vX.Y.Z.zip \
-     --title "vX.Y.Z" \
-     --notes "版本说明"
-   ```
+发布前更新 manifest.json 版本及 README；必须在 Eagle 实际环境完成验证后再创建 GitHub Release。运行包至少包含 manifest.json、index.html、logo.png、script.js、style.css。
